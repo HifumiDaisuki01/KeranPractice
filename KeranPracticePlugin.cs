@@ -28,14 +28,17 @@ public sealed class KeranPracticePlugin : BasePlugin
 
     private string _configPath = "";
     private string _dataDir = "";
+    private bool _unloading;
 
     // ---------- 生命周期 ----------
 
     public override void Load(bool hotReload)
     {
+        _unloading = false;
         _configPath = Path.GetFullPath(Path.Combine(
             ModuleDirectory, "..", "..", "configs", "plugins", "KeranPractice", "KeranPractice.json"));
-        _dataDir = Path.Combine(ModuleDirectory, "data");
+        // Data belongs outside plugin install folder so updating the DLL does not delete saves.
+        _dataDir = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "..", "..", "..", "data", "KeranPractice"));
 
         Config = JsonStore.Load<PracticeConfig>(_configPath);
         Directory.CreateDirectory(_dataDir);
@@ -53,6 +56,7 @@ public sealed class KeranPracticePlugin : BasePlugin
 
         RegisterEventHandler<EventPlayerBlind>(OnPlayerBlind);
         RegisterEventHandler<EventGrenadeThrown>(Grenades.OnGrenadeThrown);
+        RegisterListener<Listeners.OnEntitySpawned>(Grenades.OnEntitySpawned);
         RegisterEventHandler<EventBulletImpact>(Tools.OnBulletImpact);
         RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
         RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
@@ -62,6 +66,7 @@ public sealed class KeranPracticePlugin : BasePlugin
 
     public override void Unload(bool hotReload)
     {
+        _unloading = true;
         try { Flash.Stop(); } catch { }
 
         // 恢复被本插件改过的玩家状态，避免热重载后残留
@@ -73,11 +78,12 @@ public sealed class KeranPracticePlugin : BasePlugin
             try
             {
                 if (st.NoClip) pawn.MoveType = st.PreviousMoveType ?? MoveType_t.MOVETYPE_WALK;
-                if (st.God) pawn.TakesDamage = true;
+                if (st.God) pawn.TakesDamage = st.PreviousTakesDamage ?? true;
             }
             catch { }
         }
 
+        foreach (var st in States.Values) Bots.CleanupOwned(st);
         States.Clear();
         Tools.Reset();
         Console.WriteLine("[KeranPractice] 已卸载");
@@ -108,11 +114,17 @@ public sealed class KeranPracticePlugin : BasePlugin
     {
         if (States.TryGetValue(steamId, out var st))
         {
+            Bots.CleanupOwned(st);
             // 玩家断开时只清瞬态，保留 noflash 等偏好由玩家自行决定（这里统一清掉，避免残留）
             st.ResetTransient();
             States.Remove(steamId);
+            Flash.StopIfUnused();
         }
     }
+
+    public bool IsCurrentSession(PlayerState state, string map)
+        => !_unloading && Server.MapName.Equals(map, StringComparison.OrdinalIgnoreCase)
+           && States.TryGetValue(state.SteamId, out var current) && ReferenceEquals(state, current);
 
     // ---------- 事件 ----------
 
@@ -245,6 +257,11 @@ public sealed class KeranPracticePlugin : BasePlugin
     public void OnClear(CCSPlayerController? player, CommandInfo command)
         => Run(player, "clear", (p, st) => Grenades.Clear(p));
 
+    [ConsoleCommand("css_clearall", "管理员：清理全图道具")]
+    [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
+    public void OnClearAll(CCSPlayerController? player, CommandInfo command)
+        => Run(player, "clearall", (p, st) => Grenades.ClearAll(p));
+
     [ConsoleCommand("css_rethrow", "重投上一颗道具")]
     [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
     public void OnRethrow(CCSPlayerController? player, CommandInfo command)
@@ -308,6 +325,7 @@ public sealed class KeranPracticePlugin : BasePlugin
     {
         if (player == null || !player.IsValid) return;
         if (!TryGetState(player, out var st)) return;
+        if (!Permissions.CanUse(st.SteamId, "phelp", st.Practice, out var reason)) { PositionSystem.Reply(player, reason); return; }
         Tools.PrintHelp(player, st);
     }
 

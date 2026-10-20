@@ -57,8 +57,10 @@ public sealed class ToolsSystem
         if (pawn == null || !pawn.IsValid) { PositionSystem.Reply(player, "角色无效。"); return; }
 
         var next = force ?? !st.God;
+        if (next && !st.God) st.PreviousTakesDamage = pawn.TakesDamage;
         st.God = next;
-        pawn.TakesDamage = !next;
+        pawn.TakesDamage = next ? false : (st.PreviousTakesDamage ?? true);
+        if (!next) st.PreviousTakesDamage = null;
         PositionSystem.Reply(player, next ? "无敌模式已开启。" : "无敌模式已关闭。");
     }
 
@@ -148,11 +150,15 @@ public sealed class ToolsSystem
                 if (st.God)
                 {
                     st.God = false;
-                    pawn.TakesDamage = true;
+                    pawn.TakesDamage = st.PreviousTakesDamage ?? true;
+                    st.PreviousTakesDamage = null;
                 }
             }
             st.Impacts = false;
-            PositionSystem.Reply(player, "训练会话已结束，临时状态已恢复。");
+            st.NoFlash = false;
+            st.AutoClear = false;
+            _plugin.Flash.StopIfUnused();
+            PositionSystem.Reply(player, "训练会话已结束：免闪、自动清理及临时状态已恢复。");
         }
         else
         {

@@ -32,6 +32,8 @@ public sealed class PlayerState
 
     /// <summary>本插件创建的 BOT UserId 集合（只管理自己的）。</summary>
     public HashSet<int> OwnedBots { get; } = new();
+    // UserId alone may be reused, so also verify the entity handle before mutation.
+    public Dictionary<int, ulong> OwnedBotHandles { get; } = new();
 
     /// <summary>最近一次 !placebot 指向的 BOT UserId。</summary>
     public int? FocusBot { get; set; }
@@ -48,6 +50,7 @@ public sealed class PlayerState
         LastGrenade = null;
         FocusBot = null;
         OwnedBots.Clear();
+        OwnedBotHandles.Clear();
         FrozenBots.Clear();
     }
 }

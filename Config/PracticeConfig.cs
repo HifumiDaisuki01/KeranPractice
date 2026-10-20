@@ -19,10 +19,9 @@ public sealed class PracticeConfig
     public List<string> PublicCommands { get; set; } = new()
     {
         "noflash", "savepos", "tp", "poslist", "delpos", "last",
-        "clear", "rethrow", "noclip", "god", "practice", "phelp",
-        "respawn", "spawn", "tspawn", "ctspawn", "autoclear", "impacts",
-        "savenade", "nades", "loadnade", "bot", "tbot", "ctbot",
-        "placebot", "removebot", "clearbots", "freezebot", "swapbot"
+        "clear", "rethrow", "practice", "phelp",
+        "spawn", "tspawn", "ctspawn", "autoclear",
+        "savenade", "nades", "loadnade"
     };
 
     /// <summary>仅管理员/白名单可用的指令。</summary>
@@ -31,6 +30,14 @@ public sealed class PracticeConfig
     {
         "restart", "clearall", "give", "admin"
     };
+
+    /// <summary>危险功能即便写进旧 PublicCommands 也需单独显式授权，迁移时安全默认拒绝。</summary>
+    [JsonPropertyName("AllowPublicPowerCommands")]
+    public bool AllowPublicPowerCommands { get; set; } = false;
+
+    /// <summary>只有独立测试环境才显式开启 BOT 管理；KeranStrat 共存默认关闭。</summary>
+    [JsonPropertyName("EnableBotManagement")]
+    public bool EnableBotManagement { get; set; } = false;
 
     /// <summary>是否要求先在训练会话中（!practice）才能使用功能类指令。</summary>
     [JsonPropertyName("RequirePracticeMode")]
