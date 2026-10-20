@@ -26,10 +26,7 @@ public sealed class PositionSystem
         if (f.Positions != null) _positions.AddRange(f.Positions);
     }
 
-    private void Persist()
-    {
-        JsonStore.Save(_file, new PositionFile { Positions = _positions });
-    }
+    private bool Persist() => JsonStore.Save(_file, new PositionFile { Positions = _positions });
 
     private static string CurrentMap() => Server.MapName ?? "unknown";
 
@@ -78,7 +75,7 @@ public sealed class PositionSystem
             SavedAt = DateTime.UtcNow,
         });
 
-        Persist();
+        if (!Persist()) { Reply(player, "位置保存失败，请检查服务端日志。"); return; }
         Reply(player, existing != null
             ? $"已覆盖位置 [{key}]（{map}）。"
             : $"已保存位置 [{key}]（{map}）。");
@@ -146,7 +143,7 @@ public sealed class PositionSystem
         if (pos == null) { Reply(player, $"没有名为 [{name}] 的位置。"); return; }
 
         _positions.Remove(pos);
-        Persist();
+        if (!Persist()) { Reply(player, "删除后写盘失败，请检查服务端日志。"); return; }
         Reply(player, $"已删除位置 [{pos.Name}]。");
     }
 
@@ -200,5 +197,14 @@ public sealed class PositionSystem
     }
 
     public static void Reply(CCSPlayerController player, string msg)
-        => player.PrintToChat($" {ChatColors.Green}[训练]{ChatColors.Default} {msg}");
+    {
+        if (player == null || !player.IsValid) return;
+        // BOT 没有客户端连接，PrintToChat 会打到空指针上；改走日志，避免服务端异常。
+        if (player.IsBot)
+        {
+            Console.WriteLine($"[KeranPractice] (bot slot {player.Slot}) {msg}");
+            return;
+        }
+        player.PrintToChat($" {ChatColors.Green}[训练]{ChatColors.Default} {msg}");
+    }
 }

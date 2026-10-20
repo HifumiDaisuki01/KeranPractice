@@ -11,7 +11,7 @@ namespace KeranPractice;
 public sealed class KeranPracticePlugin : BasePlugin
 {
     public override string ModuleName => "KeranPractice";
-    public override string ModuleVersion => "1.0.0";
+    public override string ModuleVersion => "1.0.1";
     public override string ModuleAuthor => "Keran Technology";
     public override string ModuleDescription => "CS2 社区训练插件：道具、站位、闪光免疫、BOT 训练";
 
@@ -28,14 +28,17 @@ public sealed class KeranPracticePlugin : BasePlugin
 
     private string _configPath = "";
     private string _dataDir = "";
+    private bool _unloading;
 
     // ---------- 生命周期 ----------
 
     public override void Load(bool hotReload)
     {
+        _unloading = false;
         _configPath = Path.GetFullPath(Path.Combine(
             ModuleDirectory, "..", "..", "configs", "plugins", "KeranPractice", "KeranPractice.json"));
-        _dataDir = Path.Combine(ModuleDirectory, "data");
+        // Data belongs outside plugin install folder so updating the DLL does not delete saves.
+        _dataDir = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "..", "..", "..", "data", "KeranPractice"));
 
         Config = JsonStore.Load<PracticeConfig>(_configPath);
         Directory.CreateDirectory(_dataDir);
@@ -43,6 +46,8 @@ public sealed class KeranPracticePlugin : BasePlugin
 
         // 首次运行写默认配置
         if (!File.Exists(_configPath)) JsonStore.Save(_configPath, Config);
+
+        MigrateLegacyData(_dataDir);
 
         Permissions = new PermissionService(Config);
         Flash = new FlashSystem(this);
@@ -62,6 +67,7 @@ public sealed class KeranPracticePlugin : BasePlugin
 
     public override void Unload(bool hotReload)
     {
+        _unloading = true;
         try { Flash.Stop(); } catch { }
 
         // 恢复被本插件改过的玩家状态，避免热重载后残留
@@ -73,14 +79,41 @@ public sealed class KeranPracticePlugin : BasePlugin
             try
             {
                 if (st.NoClip) pawn.MoveType = st.PreviousMoveType ?? MoveType_t.MOVETYPE_WALK;
-                if (st.God) pawn.TakesDamage = true;
+                if (st.God) pawn.TakesDamage = st.PreviousTakesDamage ?? true;
             }
             catch { }
         }
 
+        foreach (var st in States.Values) Bots.CleanupOwned(st);
         States.Clear();
         Tools.Reset();
         Console.WriteLine("[KeranPractice] 已卸载");
+    }
+
+    /// <summary>
+    /// v1.0.0 把存档放在插件目录内（升级/重装会丢）。这里把旧文件复制到新目录，
+    /// 原文件保留不删，方便回滚；新目录已有同名文件时不覆盖。
+    /// </summary>
+    private void MigrateLegacyData(string newDir)
+    {
+        var legacyDir = Path.Combine(ModuleDirectory, "data");
+        if (!Directory.Exists(legacyDir)) return;
+
+        foreach (var name in new[] { "positions.json", "nades.json" })
+        {
+            var src = Path.Combine(legacyDir, name);
+            var dst = Path.Combine(newDir, name);
+            if (!File.Exists(src) || File.Exists(dst)) continue;
+            try
+            {
+                File.Copy(src, dst, overwrite: false);
+                Console.WriteLine($"[KeranPractice] 已迁移旧存档 {name} → {dst}（原文件保留）");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[KeranPractice] 迁移旧存档 {name} 失败: {ex.Message}");
+            }
+        }
     }
 
     // ---------- 状态 ----------
@@ -108,11 +141,17 @@ public sealed class KeranPracticePlugin : BasePlugin
     {
         if (States.TryGetValue(steamId, out var st))
         {
+            Bots.CleanupOwned(st);
             // 玩家断开时只清瞬态，保留 noflash 等偏好由玩家自行决定（这里统一清掉，避免残留）
             st.ResetTransient();
             States.Remove(steamId);
+            Flash.StopIfUnused();
         }
     }
+
+    public bool IsCurrentSession(PlayerState state, string map)
+        => !_unloading && Server.MapName.Equals(map, StringComparison.OrdinalIgnoreCase)
+           && States.TryGetValue(state.SteamId, out var current) && ReferenceEquals(state, current);
 
     // ---------- 事件 ----------
 
@@ -136,6 +175,7 @@ public sealed class KeranPracticePlugin : BasePlugin
         AddTimer(0.2f, () =>
         {
             if (player == null || !player.IsValid) return;
+            if (!IsCurrentSession(st, Server.MapName)) return;   // 期间断线/重连过，别用旧状态覆盖新角色
             var pawn = player.PlayerPawn.Value;
             if (pawn == null || !pawn.IsValid) return;
 
@@ -204,6 +244,20 @@ public sealed class KeranPracticePlugin : BasePlugin
             _ => null,
         };
 
+    // ---------- 测试脚手架（仅 KPTEST 构建） ----------
+
+#if KPTEST
+    [ConsoleCommand("css_kptest", "测试脚手架：用 BOT 驱动功能验证")]
+    [CommandHelper(minArgs: 1, usage: "<pos|god|noclip|flash|clear|iso|bot>", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
+    public void OnTest(CCSPlayerController? player, CommandInfo command)
+    {
+        var scenario = Arg(command, 1);
+        Console.WriteLine($"[KPTEST] begin {scenario}");
+        try { TestHarness.Run(this, scenario); }
+        catch (Exception ex) { Console.WriteLine($"[KPTEST] EX {ex}"); }
+    }
+#endif
+
     // ---------- P0 ----------
 
     [ConsoleCommand("css_noflash", "开关闪光免疫")]
@@ -244,6 +298,11 @@ public sealed class KeranPracticePlugin : BasePlugin
     [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
     public void OnClear(CCSPlayerController? player, CommandInfo command)
         => Run(player, "clear", (p, st) => Grenades.Clear(p));
+
+    [ConsoleCommand("css_clearall", "管理员：清理全图道具")]
+    [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
+    public void OnClearAll(CCSPlayerController? player, CommandInfo command)
+        => Run(player, "clearall", (p, st) => Grenades.ClearAll(p));
 
     [ConsoleCommand("css_rethrow", "重投上一颗道具")]
     [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
@@ -308,6 +367,7 @@ public sealed class KeranPracticePlugin : BasePlugin
     {
         if (player == null || !player.IsValid) return;
         if (!TryGetState(player, out var st)) return;
+        if (!Permissions.CanUse(st.SteamId, "phelp", st.Practice, out var reason)) { PositionSystem.Reply(player, reason); return; }
         Tools.PrintHelp(player, st);
     }
 

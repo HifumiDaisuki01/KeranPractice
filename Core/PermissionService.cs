@@ -3,6 +3,8 @@ namespace KeranPractice;
 /// <summary>权限判断：管理员全权限；普通玩家按 PublicCommands 白名单。</summary>
 public sealed class PermissionService
 {
+    private static readonly HashSet<string> HighImpact = new(StringComparer.OrdinalIgnoreCase)
+    { "god", "noclip", "respawn", "restart", "bot", "tbot", "ctbot", "placebot", "removebot", "clearbots", "freezebot", "swapbot", "clearall" };
     private readonly HashSet<ulong> _admins = new();
     private readonly HashSet<string> _public = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _adminOnly = new(StringComparer.OrdinalIgnoreCase);
@@ -57,6 +59,12 @@ public sealed class PermissionService
             return true;
         }
 
+        if (HighImpact.Contains(cmd) && !_config.AllowPublicPowerCommands)
+        {
+            reason = "高风险指令仅允许管理员使用（可在配置中显式授权）。";
+            return false;
+        }
+
         if (_adminOnly.Contains(cmd))
         {
             reason = "该指令仅限管理员使用。";
@@ -101,15 +109,14 @@ public sealed class PermissionService
     }
 
     public bool RespectKeranStrat => _config.RespectKeranStrat;
+    public bool EnableBotManagement => _config.EnableBotManagement;
     public bool AllowRoundRestart => _config.AllowRoundRestart;
     public float AutoClearDelaySeconds => _config.AutoClearDelaySeconds;
     public bool AutoClearDefault => _config.AutoClearDefault;
     public bool GodModeDefault => _config.GodModeDefault;
-    public float ImpactMarkerSeconds => _config.ImpactMarkerSeconds;
-    public int MaxImpactMarkers => _config.MaxImpactMarkers;
+    public int RethrowHoldMs => _config.RethrowHoldMs;
+    public bool AutoThrowOnRethrow => _config.AutoThrowOnRethrow;
+    public bool ReturnAfterRethrow => _config.ReturnAfterRethrow;
     public int MaxPositionsPerMap => _config.MaxPositionsPerMap;
     public int MaxNadesPerMap => _config.MaxNadesPerMap;
-    public bool TeleportOnRethrow => _config.TeleportOnRethrow;
-    public int RethrowHoldMs => _config.RethrowHoldMs;
-    public string ConsoleSteamId => _config.ConsoleSteamId;
 }

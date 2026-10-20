@@ -26,6 +26,11 @@ public sealed class FlashSystem
         _timer = _plugin.AddTimer(0.1f, Tick, TimerFlags.REPEAT);
     }
 
+    public void StopIfUnused()
+    {
+        if (!_plugin.States.Values.Any(s => s.NoFlash)) Stop();
+    }
+
     public void Stop()
     {
         _timer?.Kill();
@@ -64,6 +69,7 @@ public sealed class FlashSystem
             ClearFlashNow(player);
             Start();
         }
+        else StopIfUnused();
 
         return next;
     }

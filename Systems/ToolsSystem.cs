@@ -57,8 +57,10 @@ public sealed class ToolsSystem
         if (pawn == null || !pawn.IsValid) { PositionSystem.Reply(player, "角色无效。"); return; }
 
         var next = force ?? !st.God;
+        if (next && !st.God) st.PreviousTakesDamage = pawn.TakesDamage;
         st.God = next;
-        pawn.TakesDamage = !next;
+        pawn.TakesDamage = next ? false : (st.PreviousTakesDamage ?? true);
+        if (!next) st.PreviousTakesDamage = null;
         PositionSystem.Reply(player, next ? "无敌模式已开启。" : "无敌模式已关闭。");
     }
 
@@ -142,20 +144,37 @@ public sealed class ToolsSystem
                 if (st.NoClip)
                 {
                     pawn.MoveType = st.PreviousMoveType ?? MoveType_t.MOVETYPE_WALK;
-                    st.NoClip = false;
-                    st.PreviousMoveType = null;
                 }
                 if (st.God)
                 {
-                    st.God = false;
-                    pawn.TakesDamage = true;
+                    pawn.TakesDamage = st.PreviousTakesDamage ?? true;
                 }
             }
+            // 无论角色是否有效，状态位都必须清掉，否则下次出生会把 noclip/god 又贴回来
+            st.NoClip = false;
+            st.PreviousMoveType = null;
+            st.God = false;
+            st.PreviousTakesDamage = null;
             st.Impacts = false;
-            PositionSystem.Reply(player, "训练会话已结束，临时状态已恢复。");
+            st.NoFlash = false;
+            st.AutoClear = false;
+            _plugin.Flash.StopIfUnused();
+            PositionSystem.Reply(player, "训练会话已结束：免闪、自动清理及临时状态已恢复。");
         }
         else
         {
+            // 配置里的初始值在这里生效（v1.0.0 里这两个字段是死的）
+            st.AutoClear = _plugin.Permissions.AutoClearDefault;
+            if (_plugin.Permissions.GodModeDefault && !st.God)
+            {
+                var pawn = player.PlayerPawn.Value;
+                if (pawn != null && pawn.IsValid)
+                {
+                    st.PreviousTakesDamage = pawn.TakesDamage;
+                    st.God = true;
+                    pawn.TakesDamage = false;
+                }
+            }
             PositionSystem.Reply(player, "训练会话已开启。输入 !phelp 查看指令。");
         }
     }
@@ -184,8 +203,16 @@ public sealed class ToolsSystem
         player.PrintToChat($" {ChatColors.Yellow}!impacts{ChatColors.Default}  弹着点提示");
         player.PrintToChat($" {ChatColors.Yellow}!respawn{ChatColors.Default}  复活");
         player.PrintToChat($" {ChatColors.Yellow}!spawn / !tspawn [n] / !ctspawn [n]{ChatColors.Default}  回出生点");
-        player.PrintToChat($" {ChatColors.Yellow}!bot / !tbot / !ctbot{ChatColors.Default}  添加 BOT");
-        player.PrintToChat($" {ChatColors.Yellow}!placebot / !removebot / !clearbots / !freezebot / !swapbot{ChatColors.Default}  BOT 管理");
+
+        if (_plugin.Permissions.EnableBotManagement)
+        {
+            player.PrintToChat($" {ChatColors.Yellow}!bot / !tbot / !ctbot{ChatColors.Default}  添加 BOT");
+            player.PrintToChat($" {ChatColors.Yellow}!placebot / !removebot / !clearbots / !freezebot / !swapbot{ChatColors.Default}  BOT 管理");
+        }
+        else
+        {
+            player.PrintToChat($" {ChatColors.Grey}BOT 管理已关闭（与 KeranStrat 共用 BOT 池）{ChatColors.Default}");
+        }
 
         if (isAdmin)
         {

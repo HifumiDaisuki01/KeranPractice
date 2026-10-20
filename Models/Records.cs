@@ -27,7 +27,10 @@ public sealed class GrenadeRecord
     [JsonPropertyName("z")] public float Z { get; set; }
     [JsonPropertyName("pitch")] public float Pitch { get; set; }
     [JsonPropertyName("yaw")] public float Yaw { get; set; }
-    [JsonPropertyName("holdMs")] public int HoldMs { get; set; } = 120;
+    /// <summary>投掷瞬间玩家的移动速度（跳投/跑投的惯性）。</summary>
+    [JsonPropertyName("velX")] public float VelX { get; set; }
+    [JsonPropertyName("velY")] public float VelY { get; set; }
+    [JsonPropertyName("velZ")] public float VelZ { get; set; }
     [JsonPropertyName("thrownAt")] public DateTime ThrownAt { get; set; } = DateTime.UtcNow;
 }
 
@@ -43,7 +46,6 @@ public sealed class SavedNade
     [JsonPropertyName("z")] public float Z { get; set; }
     [JsonPropertyName("pitch")] public float Pitch { get; set; }
     [JsonPropertyName("yaw")] public float Yaw { get; set; }
-    [JsonPropertyName("holdMs")] public int HoldMs { get; set; } = 120;
     [JsonPropertyName("savedAt")] public DateTime SavedAt { get; set; } = DateTime.UtcNow;
 }
 
