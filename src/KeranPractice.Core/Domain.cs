@@ -80,7 +80,7 @@ public static class Inputs
 public sealed class AccessPolicy
 {
     public HashSet<ulong> Admins { get; init; } = [];
-    public HashSet<string> Public { get; init; } = ["noflash","savepos","tp","poslist","delpos","last","back","rethrow","clear","autoclear","nadesupply","savenade","loadnade","nades","delnade","respawn","spawn","tspawn","ctspawn"];
+    public HashSet<string> Public { get; init; } = ["noflash","savepos","tp","poslist","delpos","last","back","rethrow","clear","autoclear","nadesupply","savenade","loadnade","nades","delnade","respawn","spawn","tspawn","ctspawn","impacts","trajectory"];
     public bool TrainingEnvironmentApproved { get; init; }
     public static readonly HashSet<string> AlwaysAdmin = ["autosupply","clearall","noclip","god","bot","tbot","ctbot","placebot","removebot","clearbots","freezebot","swapbot","restart"];
     public bool Allows(ulong id,string command,bool session) => Admins.Contains(id) ||

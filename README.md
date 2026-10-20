@@ -2,7 +2,7 @@
 
 Keran Technology © 2026 · 独立重构 · `rewrite/v2.0`
 
-**当前为 Phase 2 审查构建。Phase 1 核心已由服主真人反馈正常；Phase 2 新功能待逐项真人验收，不发布正式 v2.0.0。** 旧v1历史与Release保留。新代码位于src/，不在旧GrenadeSystem/BotSystem/ToolsSystem上叠补丁。
+**当前为 Phase 3 可视化审查构建。Phase 1、Phase 2 已收到服主真人验证成功反馈；新增可视化等待真人画面及双客户端隔离验证，不发布正式 v2.0.0。** 旧v1历史与Release保留。新代码位于src/，不在旧GrenadeSystem/BotSystem/ToolsSystem上叠补丁。
 
 ## 目前可测试命令
 
@@ -11,6 +11,8 @@ Keran Technology © 2026 · 独立重构 · `rewrite/v2.0`
 | 命令 | 行为 |
 |---|---|
 | !phelp | 中文帮助 |
+| !impacts [on/off] | 个人可见蓝色3D弹着点十字，默认3秒；无参数切换 |
+| !trajectory [on/off] | 本人真实道具飞行轨迹，原投绿色、重投橙色，线段默认12秒；无参数切换 |
 | !noflash [on/off] | 个人免闪，事件清除+仅有人启用时的0.1秒维护 |
 | !savepos [名] | 按SteamID+地图保存私人站位、视角，默认名default |
 | !tp [名] | 恢复坐标/视角并以零速度传送 |
@@ -43,11 +45,11 @@ Keran Technology © 2026 · 独立重构 · `rewrite/v2.0`
 
 ## 状态
 
-53项自动测试通过；当前Linux版本五类原生工厂已完成隔离固定状态测试。真实烟雾效果、致盲事件、HE伤害、火区与燃烧伤害、诱饵启动分别记录。
+64项自动测试通过；当前Linux版本五类原生工厂已完成隔离固定状态测试。真实烟雾效果、致盲事件、HE伤害、火区与燃烧伤害、诱饵启动分别记录。
 
 这些是**合成工厂投掷/BOT目标集成测试，不是玩家真实左键/轻抛/跑跳投的完整验收**。普通双人隔离、真实烟雾画面清理、重连后的操作和KeranStrat并行真人测试仍待执行。
 
-Phase 2 私人道具库和玩家工具已编译；真人使用、重连后加载重投、无敌伤害测试和飞行恢复均待验收。Phase 3 BOT/弹着点未开放。BOT 管理仍禁用，不占用、不创建、不冻结 KSD BOT。
+Phase 2 私人道具库和玩家工具已收到服主“验证成功”反馈，未逐项测量的边界场景保留待验证。Phase 3 已新增弹着点及轨迹可视化，客户端画面和双玩家隔离待验证。BOT 管理仍禁用，不占用、不创建、不冻结 KSD BOT。
 
 道具补充只修改已识别手雷的弹药槽，不修改枪械弹匣/备用弹药，不设置 `sv_infinite_ammo`、购买规则或地图模式。KS/KSV/KSD 通过当前版本 KeranStrat 的只读兼容适配器识别，布局未知时停止补充/工具操作；不改 KeranStrat 文件。普通训练指仅 KeranPractice 会话，服务器处于 KS Practice 时仍按 KS 规则处理。
 
@@ -66,3 +68,5 @@ python3 tools/package.py
 [安装/数据迁移/回滚](docs/INSTALL-UPGRADE-ROLLBACK.md) · [逐项真实验证](VALIDATION-v2.0.md) · [技术研究与许可证](research/RESEARCH.md) · [v1历史说明](docs/HISTORY-v1.md)
 
 跨模式开关是明确的个人覆盖：`!autosupply on`后投出的道具自动补回，不会给BOT或其他玩家补充，也不会启用KSD自动复活/无敌等工具。`!autosupply off`在所有模式停止个人自动补充；`!nadesupply on`恢复原来的默认规则。普通玩家不能通过公共命令配置获得跨模式覆盖权限。
+
+[可视化说明与验收](docs/VISUALS.md)：标记使用引擎beam与CheckTransmit按本人会话发送，不设置全局sv_showimpacts。默认每人192/全服512条实体上限，退出训练/断线/切图/回合结束/卸载只清本插件标记。开启后亲手投新道具，或重投已有道具，才开始显示轨迹。

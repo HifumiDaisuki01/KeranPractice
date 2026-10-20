@@ -18,6 +18,10 @@ public sealed class Observation(uint raw,int index,Owner owner,ThrowSnapshot sho
     public bool Ended {get;set;}
     public bool Cancelled {get;set;}
     public V3? Effect {get;set;}
+    public V3? LastVisualPoint {get;set;}
+    public float LastVisualTime {get;set;}
+    public int VisualSegments {get;set;}
+    public long VisualGeneration {get;init;}=-1;
     public float Started {get;}=Server.CurrentTime;
 }
 public sealed partial class KeranPracticePlugin
@@ -28,7 +32,7 @@ public sealed partial class KeranPracticePlugin
     {
         if(_observations.Count>=Config.MaxTrackedEntities)throw new InvalidOperationException("记录实体数量达到上限；停止接受新跟踪");
         _ledger.Add(new(entity.EntityHandle.Raw,owner,batch,shot.Kind));
-        _observations[entity.EntityHandle.Raw]=new(entity.EntityHandle.Raw,(int)entity.Index,owner,shot,replay,batch);
+        _observations[entity.EntityHandle.Raw]=new(entity.EntityHandle.Raw,(int)entity.Index,owner,shot,replay,batch){VisualGeneration=_sessions.TryGetValue(owner.SteamId,out var visualSession)&&visualSession.Owner==owner&&visualSession.Trajectory?visualSession.VisualGeneration:-1};
         _trajectoryTimer??=AddTimer(.05f,Sample,TimerFlags.REPEAT);
     }
     private void Sample()
@@ -38,7 +42,7 @@ public sealed partial class KeranPracticePlugin
             if(!obs.Ended&&!obs.Cancelled)
             {
                 var e=Resolve<CBaseEntity>(raw);
-                if(e is {IsValid:true}&&e.AbsOrigin is {} origin&&obs.Path.Count<400)obs.Path.Add(Vec(origin));
+                if(e is {IsValid:true}&&e.AbsOrigin is {} origin){var point=Vec(origin);if(obs.Path.Count<400)obs.Path.Add(point);VisualSample(obs,point);}
             }
             if(obs.Cancelled||obs.Ended||Server.CurrentTime-obs.Started>22)
             {
@@ -65,7 +69,7 @@ public sealed partial class KeranPracticePlugin
     private void Terminal(string kind,int index,V3 point)
     {
         var candidates=_observations.Values.Where(o=>o.Index==index&&o.Shot.Kind==kind&&!o.Ended&&!o.Cancelled).ToArray();
-        if(candidates.Length!=1)return;var obs=candidates[0];obs.Ended=true;obs.Effect=point;
+        if(candidates.Length!=1)return;var obs=candidates[0];obs.Ended=true;obs.Effect=point;VisualSample(obs,point,true);
         Logger.LogInformation("Engine effect observed: {Kind} entity={Index} replay={Replay} position={Point}",kind,index,obs.Replay,point);
         if(obs.Replay&&Utilities.GetPlayerFromSteamId(obs.Owner.SteamId) is {IsValid:true,IsBot:false} player&&_sessions.TryGetValue(player.SteamID,out var s)&&s.Owner==obs.Owner)
             Say(player,"重投已收到引爆/生效事件："+kind+"；详细轨迹已记录");

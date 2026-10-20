@@ -11,7 +11,7 @@ for name in ['KeranPractice.dll','KeranPractice.Core.dll','KeranPractice.deps.js
 (plugin/'gamedata').mkdir(exist_ok=True);shutil.copy2(r/'gamedata/keranpractice-v2.json',plugin/'gamedata/keranpractice-v2.json')
 # Deliberately ship example separately: extracting ZIP must not overwrite a live config.
 example=dest/'examples';example.mkdir(exist_ok=True)
-(example/'KeranPractice.json').write_text(json.dumps({'ConfigVersion':2,'Admins':[],'TrainingEnvironmentApproved':False,'PublicPersonalCommands':['noflash','savepos','tp','poslist','delpos','last','back','rethrow','clear','autoclear','nadesupply','savenade','loadnade','nades','delnade','respawn','spawn','tspawn','ctspawn'],'MaxPositionsPerMap':64,'MaxLineupsPerMap':64,'AutoClearDelaySeconds':3,'EnableNativeReplay':True,'MaxTrackedEntities':256},indent=2)+'\n')
+(example/'KeranPractice.json').write_text(json.dumps({'ConfigVersion':2,'Admins':[],'TrainingEnvironmentApproved':False,'PublicPersonalCommands':['noflash','savepos','tp','poslist','delpos','last','back','rethrow','clear','autoclear','nadesupply','savenade','loadnade','nades','delnade','respawn','spawn','tspawn','ctspawn','impacts','trajectory'],'MaxPositionsPerMap':64,'MaxLineupsPerMap':64,'AutoClearDelaySeconds':3,'EnableNativeReplay':True,'MaxTrackedEntities':256,'MaxVisualsPerPlayer':192,'MaxVisualsGlobal':512,'ImpactSeconds':3,'TrajectorySeconds':12},indent=2)+'\n')
 for n in ['README.md','VALIDATION-v2.0.md','LICENSE']:shutil.copy2(r/n,dest/n)
 shutil.copytree(r/'docs',dest/'docs',dirs_exist_ok=True)
 licenses=dest/'licenses';licenses.mkdir(exist_ok=True);shutil.copy2(r/'research/MatchZy-LICENSE.txt',licenses/'MatchZy-LICENSE.txt')
