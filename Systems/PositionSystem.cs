@@ -26,10 +26,7 @@ public sealed class PositionSystem
         if (f.Positions != null) _positions.AddRange(f.Positions);
     }
 
-    private void Persist()
-    {
-        JsonStore.Save(_file, new PositionFile { Positions = _positions });
-    }
+    private bool Persist() => JsonStore.Save(_file, new PositionFile { Positions = _positions });
 
     private static string CurrentMap() => Server.MapName ?? "unknown";
 
@@ -78,7 +75,7 @@ public sealed class PositionSystem
             SavedAt = DateTime.UtcNow,
         });
 
-        Persist();
+        if (!Persist()) { Reply(player, "位置保存失败，请检查服务端日志。"); return; }
         Reply(player, existing != null
             ? $"已覆盖位置 [{key}]（{map}）。"
             : $"已保存位置 [{key}]（{map}）。");
@@ -146,7 +143,7 @@ public sealed class PositionSystem
         if (pos == null) { Reply(player, $"没有名为 [{name}] 的位置。"); return; }
 
         _positions.Remove(pos);
-        Persist();
+        if (!Persist()) { Reply(player, "删除后写盘失败，请检查服务端日志。"); return; }
         Reply(player, $"已删除位置 [{pos.Name}]。");
     }
 

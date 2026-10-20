@@ -14,7 +14,22 @@ public sealed class BotSystem
 {
     private readonly KeranPracticePlugin _plugin;
 
-    private static readonly string[] AllowedDesigners = Array.Empty<string>();
+    private bool Available(CCSPlayerController p)
+    {
+        if (_plugin.Permissions.EnableBotManagement) return true;
+        PositionSystem.Reply(p, "BOT 管理已安全禁用；仅在独立测试服显式开启 EnableBotManagement。");
+        return false;
+    }
+
+    private bool Owned(CCSPlayerController bot, PlayerState state)
+        => bot.IsValid && bot.IsBot && bot.UserId is int id && state.OwnedBotHandles.TryGetValue(id, out var handle)
+           && handle == bot.EntityHandle.Raw;
+
+    public void CleanupOwned(PlayerState st)
+    {
+        // Never disconnect bots on unload or player disconnect: those bots may now be managed by KeranStrat.
+        st.OwnedBots.Clear(); st.OwnedBotHandles.Clear(); st.FrozenBots.Clear(); st.FocusBot = null;
+    }
 
     public BotSystem(KeranPracticePlugin plugin)
     {
@@ -23,6 +38,8 @@ public sealed class BotSystem
 
     public void AddBot(CCSPlayerController player, PlayerState st, string team)
     {
+        if (!Available(player)) return;
+        // Never infer ownership from all bots that appeared during an asynchronous window.
         var before = Utilities.GetPlayers()
             .Where(p => p != null && p.IsValid && p.IsBot)
             .Select(p => p.UserId ?? 0)
@@ -38,6 +55,7 @@ public sealed class BotSystem
         Server.ExecuteCommand(cmd);
 
         // 延迟确认新 BOT，记录归属
+        var map = Server.MapName;
         _plugin.AddTimer(0.5f, () =>
         {
             var after = Utilities.GetPlayers()
@@ -45,11 +63,18 @@ public sealed class BotSystem
                 .ToList();
 
             var added = after.Where(p => !before.Contains(p.UserId ?? 0)).ToList();
+            if (!_plugin.IsCurrentSession(st, map) || player == null || !player.IsValid) return;
+            if (added.Count != 1)
+            {
+                PositionSystem.Reply(player, "无法唯一识别本次创建的 BOT，拒绝认领；请在独立训练服重试。");
+                return;
+            }
             foreach (var b in added)
             {
                 var id = b.UserId ?? 0;
                 if (id == 0) continue;
                 st.OwnedBots.Add(id);
+                st.OwnedBotHandles[id] = b.EntityHandle.Raw;
                 st.FocusBot = id;
             }
 
@@ -71,12 +96,12 @@ public sealed class BotSystem
         if (st.FocusBot.HasValue)
         {
             var b = Utilities.GetPlayers().FirstOrDefault(p => p != null && p.IsValid && p.IsBot && (p.UserId ?? 0) == st.FocusBot.Value);
-            if (b != null) return b;
+            if (b != null && Owned(b, st)) return b;
         }
 
         // 退而求其次：取自己创建的、仍存活的任意一个
         var any = Utilities.GetPlayers().FirstOrDefault(p =>
-            p != null && p.IsValid && p.IsBot && st.OwnedBots.Contains(p.UserId ?? 0));
+            p != null && p.IsValid && p.IsBot && Owned(p, st));
         if (any != null) return any;
 
         error = "没有可用的训练 BOT。先 !bot 添加，或用 !placebot 指向一个。";
@@ -85,6 +110,7 @@ public sealed class BotSystem
 
     public void PlaceBot(CCSPlayerController player, PlayerState st)
     {
+        if (!Available(player)) return;
         var bot = ResolveOwnedBot(player, st, out var err);
         if (bot == null) { PositionSystem.Reply(player, err); return; }
 
@@ -106,11 +132,13 @@ public sealed class BotSystem
 
     public void RemoveBot(CCSPlayerController player, PlayerState st)
     {
+        if (!Available(player)) return;
         var bot = ResolveOwnedBot(player, st, out var err);
         if (bot == null) { PositionSystem.Reply(player, err); return; }
 
         var id = bot.UserId ?? 0;
         st.OwnedBots.Remove(id);
+        st.OwnedBotHandles.Remove(id);
         if (st.FocusBot == id) st.FocusBot = null;
 
         bot.Disconnect(NetworkDisconnectionReason.NETWORK_DISCONNECT_KICKED);
@@ -119,8 +147,9 @@ public sealed class BotSystem
 
     public void ClearBots(CCSPlayerController player, PlayerState st)
     {
+        if (!Available(player)) return;
         var all = Utilities.GetPlayers()
-            .Where(p => p != null && p.IsValid && p.IsBot && st.OwnedBots.Contains(p.UserId ?? 0))
+            .Where(p => p != null && p.IsValid && p.IsBot && Owned(p, st))
             .ToList();
 
         foreach (var b in all)
@@ -130,6 +159,7 @@ public sealed class BotSystem
 
         var n = all.Count;
         st.OwnedBots.Clear();
+        st.OwnedBotHandles.Clear();
         st.FrozenBots.Clear();
         st.FocusBot = null;
 
@@ -138,6 +168,7 @@ public sealed class BotSystem
 
     public void FreezeBot(CCSPlayerController player, PlayerState st)
     {
+        if (!Available(player)) return;
         var bot = ResolveOwnedBot(player, st, out var err);
         if (bot == null) { PositionSystem.Reply(player, err); return; }
 
@@ -161,6 +192,7 @@ public sealed class BotSystem
 
     public void SwapBot(CCSPlayerController player, PlayerState st)
     {
+        if (!Available(player)) return;
         var bot = ResolveOwnedBot(player, st, out var err);
         if (bot == null) { PositionSystem.Reply(player, err); return; }
 

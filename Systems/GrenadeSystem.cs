@@ -40,7 +40,7 @@ public sealed class GrenadeSystem
         if (f.Nades != null) _nades.AddRange(f.Nades);
     }
 
-    private void Persist() => JsonStore.Save(_file, new NadeFile { Nades = _nades });
+    private bool Persist() => JsonStore.Save(_file, new NadeFile { Nades = _nades });
 
     private static string CurrentMap() => Server.MapName ?? "unknown";
 
@@ -76,6 +76,32 @@ public sealed class GrenadeSystem
         _ => type,
     };
 
+    // ---------- 实体生命周期：记录真实投掷物参数 ----------
+    public void OnEntitySpawned(CEntityInstance entity)
+    {
+        if (entity == null || entity.Entity == null || !ProjectileDesigners.Contains(entity.Entity.DesignerName)) return;
+        uint index = entity.Index;
+        string designer = entity.Entity.DesignerName;
+        if (designer == "inferno") return;
+        Server.NextFrame(() =>
+        {
+            var projectile = Utilities.GetEntityFromIndex<CBaseCSGrenadeProjectile>((int)index);
+            if (projectile == null || !projectile.IsValid || projectile.DesignerName != designer || projectile.Globalname == "keranpractice_rethrow") return;
+            if (projectile.Thrower.Value?.Controller.Value is not CCSPlayerController player || !player.IsValid) return;
+            if (!_plugin.TryGetState(player, out var st) || projectile.AbsOrigin == null || projectile.AbsRotation == null) return;
+            var velocity = projectile.InitialVelocity;
+            if (velocity == null) return;
+            var rec = st.LastGrenade;
+            if (rec == null || rec.Map != CurrentMap()) return;
+            rec.ProjectileX = projectile.AbsOrigin.X; rec.ProjectileY = projectile.AbsOrigin.Y; rec.ProjectileZ = projectile.AbsOrigin.Z;
+            rec.VelocityX = velocity.X; rec.VelocityY = velocity.Y; rec.VelocityZ = velocity.Z;
+            rec.AngleX = projectile.AbsRotation.X; rec.AngleY = projectile.AbsRotation.Y; rec.AngleZ = projectile.AbsRotation.Z;
+            rec.AngularVelocityX = projectile.AngVelocity.X; rec.AngularVelocityY = projectile.AngVelocity.Y; rec.AngularVelocityZ = projectile.AngVelocity.Z;
+            rec.ItemIndex = projectile.ItemIndex;
+            rec.HasProjectileSnapshot = true;
+        });
+    }
+
     // ---------- 事件：记录投掷 ----------
 
     public HookResult OnGrenadeThrown(EventGrenadeThrown e, GameEventInfo info)
@@ -106,11 +132,13 @@ public sealed class GrenadeSystem
         if (st.AutoClear)
         {
             var delay = Math.Max(0.1f, _plugin.Permissions.AutoClearDelaySeconds);
+            var owner = st.SteamId;
+            var map = CurrentMap();
             _plugin.AddTimer(delay, () =>
             {
-                if (!st.AutoClear) return;
-                var n = ClearProjectiles();
-                if (n > 0) PositionSystem.Reply(player, $"自动清理了 {n} 个投掷物。");
+                if (!_plugin.IsCurrentSession(st, map) || !st.AutoClear) return;
+                var n = ClearProjectiles(owner);
+                if (n > 0 && player.IsValid) PositionSystem.Reply(player, $"自动清理了自己 {n} 个投掷物。");
             });
         }
 
@@ -122,56 +150,43 @@ public sealed class GrenadeSystem
     public void Rethrow(CCSPlayerController player, PlayerState st)
     {
         var rec = st.LastGrenade;
-        if (rec == null) { PositionSystem.Reply(player, "还没有投掷记录。先扔一颗道具。"); return; }
-
-        if (!rec.Map.Equals(CurrentMap(), StringComparison.OrdinalIgnoreCase))
-        {
-            PositionSystem.Reply(player, $"上颗道具在 {rec.Map} 投掷，当前地图是 {CurrentMap()}。");
-            return;
-        }
-
+        if (rec == null || rec.Map != CurrentMap()) { PositionSystem.Reply(player, "当前地图没有可重投的道具。"); return; }
+        if (!rec.HasProjectileSnapshot) { PositionSystem.Reply(player, "没有捕获真实投掷物速度，拒绝不准确的按键模拟重投。"); return; }
         var pawn = player.PlayerPawn.Value;
-        if (pawn == null || !pawn.IsValid) { PositionSystem.Reply(player, "角色无效。"); return; }
-
-        if (_plugin.Permissions.TeleportOnRethrow)
+        if (pawn == null || !pawn.IsValid || pawn.Health <= 0) { PositionSystem.Reply(player, "需要存活的角色才能重投。"); return; }
+        var designer = rec.Type switch
         {
-            if (pawn.Health <= 0) { PositionSystem.Reply(player, "死亡状态无法重投。"); return; }
-            pawn.Teleport(new Vector(rec.X, rec.Y, rec.Z),
-                          new QAngle(rec.Pitch, rec.Yaw, 0f),
-                          new Vector(0f, 0f, 0f));
-        }
-
-        var weapon = ToWeaponName(rec.Type);
-        player.GiveNamedItem(weapon);
-
-        // 切到该道具并模拟投掷
-        var type = rec.Type;
-        _plugin.AddTimer(0.05f, () =>
-        {
-            if (player == null || !player.IsValid) return;
-            player.ExecuteClientCommandFromServer($"use {weapon}");
-
-            _plugin.AddTimer(0.08f, () =>
-            {
-                if (player == null || !player.IsValid) return;
-                player.ExecuteClientCommandFromServer("+attack");
-
-                var hold = Math.Clamp(rec.HoldMs, 20, 1000) / 1000f;
-                _plugin.AddTimer(hold, () =>
-                {
-                    if (player == null || !player.IsValid) return;
-                    player.ExecuteClientCommandFromServer("-attack");
-                });
-            });
-        });
-
-        PositionSystem.Reply(player, $"正在重投 {DisplayName(rec.Type)}（同一位置与视角）。");
+            "smoke" => "smokegrenade_projectile", "flash" => "flashbang_projectile",
+            "he" => "hegrenade_projectile", "molotov" => "molotov_projectile",
+            "decoy" => "decoy_projectile", _ => ""
+        };
+        if (designer == "") { PositionSystem.Reply(player, "不支持的投掷物类型。"); return; }
+        // No simulated +attack. This reproduces the projectile physical state independently of the observer.
+        // Some CS2 builds require a native factory to initialize smoke/inferno effects; verify in game.
+        var entity = Utilities.CreateEntityByName<CBaseCSGrenadeProjectile>(designer);
+        if (entity == null || !entity.IsValid) { PositionSystem.Reply(player, "无法创建投掷物实体。"); return; }
+        entity.Globalname = "keranpractice_rethrow";
+        entity.DispatchSpawn();
+        entity.ItemIndex = rec.ItemIndex;
+        var pos = new Vector(rec.ProjectileX, rec.ProjectileY, rec.ProjectileZ);
+        var vel = new Vector(rec.VelocityX, rec.VelocityY, rec.VelocityZ);
+        entity.InitialPosition.X = pos.X; entity.InitialPosition.Y = pos.Y; entity.InitialPosition.Z = pos.Z;
+        entity.InitialVelocity.X = vel.X; entity.InitialVelocity.Y = vel.Y; entity.InitialVelocity.Z = vel.Z;
+        entity.AngVelocity.X = rec.AngularVelocityX;
+        entity.AngVelocity.Y = rec.AngularVelocityY;
+        entity.AngVelocity.Z = rec.AngularVelocityZ;
+        entity.Thrower.Raw = player.PlayerPawn.Raw;
+        entity.OriginalThrower.Raw = player.PlayerPawn.Raw;
+        entity.OwnerEntity.Raw = player.PlayerPawn.Raw;
+        entity.TeamNum = player.TeamNum;
+        entity.Teleport(pos, new QAngle(rec.AngleX, rec.AngleY, rec.AngleZ), vel);
+        PositionSystem.Reply(player, "已重建道具实体（真实速度）；请实测落点及烟火效果。");
     }
 
     // ---------- 清理 ----------
 
     /// <summary>删除场上所有投掷物与火焰，返回删除数量。</summary>
-    public int ClearProjectiles()
+    public int ClearProjectiles(ulong? ownerSteamId = null)
     {
         var removed = 0;
         foreach (var designer in ProjectileDesigners)
@@ -186,6 +201,11 @@ public sealed class GrenadeSystem
             foreach (var ent in ents)
             {
                 if (ent == null || !ent.IsValid) continue;
+                // Fail closed. Only projectiles with a verified thrower are eligible for personal cleanup.
+                if (ownerSteamId.HasValue)
+                {
+                    if (ent is not CBaseGrenade grenade || grenade.Thrower.Value?.Controller.Value is not CCSPlayerController thrower || thrower.SteamID != ownerSteamId.Value) continue;
+                }
                 try { ent.Remove(); removed++; } catch { }
             }
         }
@@ -194,8 +214,14 @@ public sealed class GrenadeSystem
 
     public void Clear(CCSPlayerController player)
     {
+        var n = ClearProjectiles(player.SteamID);
+        PositionSystem.Reply(player, n > 0 ? $"已清除自己 {n} 个投掷物。"  : "场上没有可清理的投掷物。");
+    }
+
+    public void ClearAll(CCSPlayerController player)
+    {
         var n = ClearProjectiles();
-        PositionSystem.Reply(player, n > 0 ? $"已清除 {n} 个投掷物 / 火焰。" : "场上没有可清理的投掷物。");
+        PositionSystem.Reply(player, $"管理员已清理全图 {n} 个道具实体。");
     }
 
     public void ToggleAutoClear(CCSPlayerController player, PlayerState st, bool? force)
@@ -216,9 +242,10 @@ public sealed class GrenadeSystem
         if (name.Length > 32) { PositionSystem.Reply(player, "名称过长（最多 32 字符）。"); return; }
 
         var map = CurrentMap();
-        var mine = _nades.Where(n => n.Map.Equals(map, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (rec.Map != map) { PositionSystem.Reply(player, "上一颗道具不在当前地图。"); return; }
+        var mine = _nades.Where(n => n.Map.Equals(map, StringComparison.OrdinalIgnoreCase) && n.SteamId == st.SteamId).ToList();
 
-        if (mine.Count >= _plugin.Permissions.MaxNadesPerMap)
+        if (mine.Count >= _plugin.Permissions.MaxNadesPerMap && !mine.Any(n => n.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase)))
         {
             PositionSystem.Reply(player, $"本图道具点位已达上限（{_plugin.Permissions.MaxNadesPerMap} 个）。");
             return;
@@ -240,14 +267,14 @@ public sealed class GrenadeSystem
             SavedAt = DateTime.UtcNow,
         });
 
-        Persist();
+        if (!Persist()) { PositionSystem.Reply(player, "道具存档写入失败，请检查日志。"); return; }
         PositionSystem.Reply(player, $"已保存道具点位 [{name.Trim()}]（{DisplayName(rec.Type)}，{map}）。");
     }
 
     public void ListNades(CCSPlayerController player, PlayerState st)
     {
         var map = CurrentMap();
-        var mine = _nades.Where(n => n.Map.Equals(map, StringComparison.OrdinalIgnoreCase))
+        var mine = _nades.Where(n => n.Map.Equals(map, StringComparison.OrdinalIgnoreCase) && n.SteamId == st.SteamId)
                          .OrderBy(n => n.Name).ToList();
 
         if (mine.Count == 0) { PositionSystem.Reply(player, $"本图（{map}）还没有保存的道具。"); return; }
@@ -267,7 +294,7 @@ public sealed class GrenadeSystem
         if (string.IsNullOrWhiteSpace(key)) { PositionSystem.Reply(player, "用法：!loadnade <名称或编号>"); return; }
 
         var map = CurrentMap();
-        var all = _nades.Where(n => n.Map.Equals(map, StringComparison.OrdinalIgnoreCase))
+        var all = _nades.Where(n => n.Map.Equals(map, StringComparison.OrdinalIgnoreCase) && n.SteamId == st.SteamId)
                         .OrderBy(n => n.Name).ToList();
         if (all.Count == 0) { PositionSystem.Reply(player, "本图还没有保存的道具点位。"); return; }
 

@@ -28,6 +28,20 @@ public sealed class GrenadeRecord
     [JsonPropertyName("pitch")] public float Pitch { get; set; }
     [JsonPropertyName("yaw")] public float Yaw { get; set; }
     [JsonPropertyName("holdMs")] public int HoldMs { get; set; } = 120;
+    public bool HasProjectileSnapshot { get; set; }
+    public ushort ItemIndex { get; set; }
+    public float ProjectileX { get; set; }
+    public float ProjectileY { get; set; }
+    public float ProjectileZ { get; set; }
+    public float VelocityX { get; set; }
+    public float VelocityY { get; set; }
+    public float VelocityZ { get; set; }
+    public float AngleX { get; set; }
+    public float AngleY { get; set; }
+    public float AngleZ { get; set; }
+    public float AngularVelocityX { get; set; }
+    public float AngularVelocityY { get; set; }
+    public float AngularVelocityZ { get; set; }
     [JsonPropertyName("thrownAt")] public DateTime ThrownAt { get; set; } = DateTime.UtcNow;
 }
 
