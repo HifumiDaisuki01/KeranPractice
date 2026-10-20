@@ -31,16 +31,27 @@ public sealed partial class KeranPracticePlugin
         catch(Exception e){Logger.LogWarning("KS isolation check unavailable: {Error}",e.Message);return true;}
     }
     private static void CancelSupply(Session s){foreach(var timer in s.SupplyTasks)timer.Kill();s.SupplyTasks.Clear();}
+    private bool AutomaticSupplyAllowed(Session s)=>SupplyRules.AutomaticAllowed(s.SupplyEnabled,s.CrossModeSupply&&_policy.Admins.Contains(s.Owner.SteamId),()=>DefenseBlocksTools(true));
+    private void AutoSupplyCommand(CCSPlayerController p,Session s,CommandInfo cmd)
+    {
+        if(cmd.ArgCount>2)throw new ArgumentException("用法 !autosupply [on/off]");
+        var arg=cmd.ArgCount>1?cmd.GetArg(1):s.SupplyEnabled&&s.CrossModeSupply?"off":"on";
+        if(arg is not ("on" or "off"))throw new ArgumentException("用法 !autosupply [on/off]");
+        if(arg=="on"&&!_native.Ready)throw new InvalidOperationException("自动补充未开启："+_native.Status);
+        CancelSupply(s);s.CrossModeSupply=arg=="on";s.SupplyEnabled=arg=="on";
+        if(arg=="on")s.Active=true;
+        Say(p,arg=="on"?"个人跨模式自动补充开启（含KS/KSV/KSD）；投出道具后补回，枪械弹药不变":"个人自动补充已关闭（所有模式），待补发任务已取消");
+    }
     private void ScheduleSupply(CCSPlayerController p,Session s,ThrowSnapshot shot)
     {
-        if(!s.SupplyEnabled||DefenseBlocksTools(true))return;
+        if(!AutomaticSupplyAllowed(s))return;
         if(s.SupplyTasks.Count>=8)return;
         var pawn=p.PlayerPawn.Raw;var team=p.TeamNum;
         Timer? timer=null;
         timer=AddTimer(.65f,()=>
         {
             if(timer!=null)s.SupplyTasks.Remove(timer);
-            if(!Current(p,s)||!s.Active||!s.SupplyEnabled||p.PlayerPawn.Raw!=pawn||p.TeamNum!=team||!p.PawnIsAlive||DefenseBlocksTools(true))return;
+            if(!Current(p,s)||!s.Active||p.PlayerPawn.Raw!=pawn||p.TeamNum!=team||!p.PawnIsAlive||!AutomaticSupplyAllowed(s))return;
             try{EnsureGrenade(p,SupplyRules.Weapon(shot.Kind,team),shot.Kind=="flash"?2:1);}
             catch(Exception e){Say(p,"道具补充失败，请用 !nadesupply 重试");Logger.LogWarning(e,"Grenade supply failed");}
         },TimerFlags.STOP_ON_MAPCHANGE);
@@ -61,11 +72,11 @@ public sealed partial class KeranPracticePlugin
     private void SupplyCommand(CCSPlayerController p,Session s,CommandInfo cmd)
     {
         var arg=cmd.ArgCount>1?cmd.GetArg(1):"fill";
-        if(arg=="off"){s.SupplyEnabled=false;CancelSupply(s);Say(p,"个人道具自动补充关闭");return;}
+        if(arg=="off"){s.SupplyEnabled=false;s.CrossModeSupply=false;CancelSupply(s);Say(p,"个人道具自动补充关闭");return;}
         if(arg is not ("on" or "fill"))throw new ArgumentException("用法 !nadesupply [on/off]");
         if(DefenseBlocksTools())throw new InvalidOperationException("KSD 防守模式或隔离状态未知，禁止补充道具");
         Pawn(p);s.SupplyEnabled=true;
         foreach(var kind in Kinds.Names.Keys)EnsureGrenade(p,SupplyRules.Weapon(kind,p.TeamNum),kind=="flash"?2:1);
-        Say(p,DefenseBlocksTools(true)?"道具已手动补齐（双闪）；KS/KSV 不自动补充":"道具已补齐（双闪）；自动补充开启，枪械弹药保持正常消耗");
+        Say(p,s.CrossModeSupply?"道具已补齐（双闪）；个人跨模式自动补充保持开启":DefenseBlocksTools(true)?"道具已手动补齐（双闪）；KS/KSV 不自动补充":"道具已补齐（双闪）；自动补充开启，枪械弹药保持正常消耗");
     }
 }

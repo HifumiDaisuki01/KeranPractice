@@ -1,6 +1,7 @@
 namespace KeranPractice.Core;
 public static class SupplyRules
 {
+    public static bool AutomaticAllowed(bool enabled,bool explicitOverride,Func<bool> defaultBlocked)=>enabled&&(explicitOverride||!defaultBlocked());
     public static bool Blocked(bool? defense,bool? lease,string? training,bool? versus,bool? changing,bool automatic)=>
         defense is not false||lease is not false||changing is not false||training is not ("Practice" or "Deathmatch")||versus==null||
         (automatic&&(training=="Practice"||versus==true));

@@ -21,6 +21,7 @@ Keran Technology © 2026 · 独立重构 · `rewrite/v2.0`
 | !savenade 名 | 保存完整物理状态和站位；同玩家同地图同名覆盖 |
 | !loadnade 名 | 选中私人存档并返回站位；随后可移动到别处 !rethrow；新真实投掷取消选择 |
 | !nades / !delnade 名 | 列出/删除本图私人道具 |
+| !autosupply [on/off] | 管理员个人跨模式自动补充开关（含KS/KSV/KSD），无参数切换；on自动启用个人会话，off取消待补发，不影响枪械；退出训练/离线/切图清除选择 |
 | !nadesupply [on/off] | 无参数/on立即补齐烟、双闪、HE、火、诱饵；off关闭个人自动补充。普通会话自动补，KS/KSV只能手动补，KSD禁止 |
 | !noclip [on/off] / !god [on/off] | 管理员自由飞行/无敌；退出/死亡/切队/回合结束/卸载恢复原状态；KSD禁止 |
 | !respawn | T/CT死亡玩家请求复活；KSD禁止 |
@@ -42,7 +43,7 @@ Keran Technology © 2026 · 独立重构 · `rewrite/v2.0`
 
 ## 状态
 
-48项自动测试通过；当前Linux版本五类原生工厂已完成隔离固定状态测试。真实烟雾效果、致盲事件、HE伤害、火区与燃烧伤害、诱饵启动分别记录。
+53项自动测试通过；当前Linux版本五类原生工厂已完成隔离固定状态测试。真实烟雾效果、致盲事件、HE伤害、火区与燃烧伤害、诱饵启动分别记录。
 
 这些是**合成工厂投掷/BOT目标集成测试，不是玩家真实左键/轻抛/跑跳投的完整验收**。普通双人隔离、真实烟雾画面清理、重连后的操作和KeranStrat并行真人测试仍待执行。
 
@@ -63,3 +64,5 @@ python3 tools/package.py
 依赖.NET10 SDK及CSS API 1.0.376（运行时由服务器提供）。构建要求零错误零警告，CI上传审查ZIP，不自动发正式Release。
 
 [安装/数据迁移/回滚](docs/INSTALL-UPGRADE-ROLLBACK.md) · [逐项真实验证](VALIDATION-v2.0.md) · [技术研究与许可证](research/RESEARCH.md) · [v1历史说明](docs/HISTORY-v1.md)
+
+跨模式开关是明确的个人覆盖：`!autosupply on`后投出的道具自动补回，不会给BOT或其他玩家补充，也不会启用KSD自动复活/无敌等工具。`!autosupply off`在所有模式停止个人自动补充；`!nadesupply on`恢复原来的默认规则。普通玩家不能通过公共命令配置获得跨模式覆盖权限。

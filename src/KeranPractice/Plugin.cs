@@ -27,6 +27,7 @@ public sealed class Session(Owner owner,uint controller)
     public bool Active {get;set;}
     public bool NoFlash {get;set;}
     public bool SupplyEnabled {get;set;}=true;
+    public bool CrossModeSupply {get;set;}
     public List<Timer> SupplyTasks {get;}=[];
     public bool AutoClear {get;set;}
     public float AutoClearDelay {get;set;}=3;
@@ -42,7 +43,7 @@ public sealed class Session(Owner owner,uint controller)
 public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<PracticeConfig>
 {
     public override string ModuleName=>"KeranPractice";
-    public override string ModuleVersion=>"2.0.0-phase2-review";
+    public override string ModuleVersion=>"2.0.0-phase2.1-review";
     public override string ModuleAuthor=>"Keran Technology © 2026";
     public override string ModuleDescription=>"Independent practice rewrite; native physics replay";
     public PracticeConfig Config {get;set;}=new();
@@ -67,9 +68,9 @@ public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<Pract
         var legacy=Path.Combine(ModuleDirectory,"data/positions.json");var imported=_store.ImportLegacy(legacy);if(imported>0)Logger.LogInformation("Imported {Count} legacy positions; source retained",imported);
         _native.Created+=Capture;
         if(Config.EnableNativeReplay)_native.Initialize(Path.Combine(ModuleDirectory,"gamedata/keranpractice-v2.json"));
-        foreach(var cmd in new[]{"practice","phelp","noflash","savepos","tp","poslist","delpos","last","back","rethrow","clear","clearall","autoclear","nadesupply","savenade","loadnade","nades","delnade","noclip","god","respawn","spawn","tspawn","ctspawn"})
+        foreach(var cmd in new[]{"practice","phelp","noflash","savepos","tp","poslist","delpos","last","back","rethrow","clear","clearall","autoclear","nadesupply","autosupply","savenade","loadnade","nades","delnade","noclip","god","respawn","spawn","tspawn","ctspawn"})
         {var name=cmd;AddCommand("css_"+name,"KeranPractice v2: "+name,(player,args)=>Execute(name,player,args));}
-        AddCommand("kpv2_status","Read-only diagnostics",(_,cmd)=>cmd.ReplyToCommand($"KeranPractice 2.0.0-phase2-review; native={_native.Status}; sessions={_sessions.Count}; bots=disabled; dataVersion=2"));
+        AddCommand("kpv2_status","Read-only diagnostics",(_,cmd)=>cmd.ReplyToCommand($"KeranPractice 2.0.0-phase2.1-review; native={_native.Status}; sessions={_sessions.Count}; bots=disabled; dataVersion=2"));
         RegisterEventHandler<EventPlayerBlind>((e,_)=>{if(e.Userid is {} p&&_sessions.TryGetValue(p.SteamID,out var s)&&s.NoFlash)ClearFlash(p);return HookResult.Continue;},HookMode.Pre);
         RegisterListener<Listeners.OnClientDisconnect>(slot=>{if(_slots.Remove(slot,out var id))Exit(id);});
         RegisterListener<Listeners.OnMapStart>(_=>ResetMap());
@@ -77,7 +78,7 @@ public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<Pract
         RegisterEventHandler<EventRoundEnd>((_,_)=>{CancelRoundWork();return HookResult.Continue;});
         RegisterListener<Listeners.OnEntitySpawned>(ObserveSpawn);
         RegisterListener<Listeners.OnEntityDeleted>(e=>_ledger.Remove(e.EntityHandle.Raw));
-        AddCommand("kpv2_supply_status","Read-only supply isolation diagnostics",(_,cmd)=>cmd.ReplyToCommand($"supply manualBlocked={DefenseBlocksTools()}; autoBlocked={DefenseBlocksTools(true)}; KS/KSV manual-only; KSD blocked"));
+        AddCommand("kpv2_supply_status","Read-only supply isolation diagnostics",(_,cmd)=>cmd.ReplyToCommand($"supply manualBlocked={DefenseBlocksTools()}; autoBlocked={DefenseBlocksTools(true)}; default KS/KSV manual-only, KSD blocked; explicitOverrides={_sessions.Values.Count(s=>s.CrossModeSupply&&s.SupplyEnabled)}"));
         RegisterToolsLifecycle();RegisterEffects();RegisterProbe();
         Logger.LogInformation("KeranPractice v2 loaded; {Native}; old architecture not loaded",_native.Status);
     }
@@ -107,11 +108,16 @@ public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<Pract
             var s=SessionFor(p);
             if(command=="phelp")
             {
-                Say(p,"训练：!practice on/off | !noflash [on/off] | !nadesupply [on/off]（KS/KSV 仅手动补齐）");
+                Say(p,"训练：!practice on/off | !noflash [on/off] | !nadesupply [on/off]（默认KS/KSV仅手动）；管理员 !autosupply on/off 跨模式补充");
                 Say(p,"位置：!savepos 名 / !tp 名 / !poslist / !delpos 名；!last 返回上次真实投掷站位；!back 往返传送");
                 Say(p,"道具：!rethrow 重投已选道具或最新投掷；!clear；!autoclear on/off [秒]；管理员 !clearall");
                 Say(p,"私有道具库：!savenade 名 / !loadnade 名（选中并返回站位）/ !nades / !delnade 名；新投掷取消选中");
                 Say(p,"工具：!respawn / !spawn [序号] / !tspawn [序号] / !ctspawn [序号]；管理员 !noclip / !god [on/off]。BOT 未开放。");return;
+            }
+            if(command=="autosupply")
+            {
+                if(!_policy.Admins.Contains(p.SteamID))throw new InvalidOperationException("跨模式自动补充仅管理员可用");
+                AutoSupplyCommand(p,s,cmd);return;
             }
             if(command=="practice")
             {
