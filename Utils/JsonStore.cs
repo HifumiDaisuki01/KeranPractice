@@ -56,7 +56,8 @@ public static class JsonStore
 
             if (File.Exists(path))
             {
-                // 同分区原子替换
+                // File.Replace / rename(2) 在同一文件系统上是原子的；
+                // 任何一种失败都只保留旧文件，绝不再「先删后移」。
                 try { File.Replace(tmp, path, null); }
                 catch (PlatformNotSupportedException) { File.Move(tmp, path, overwrite: true); }
                 catch (IOException) { File.Move(tmp, path, overwrite: true); }
@@ -70,6 +71,7 @@ public static class JsonStore
         catch (Exception ex)
         {
             Console.WriteLine($"[KeranPractice] 写入 {path} 失败: {ex.Message}");
+            try { if (File.Exists(path + ".tmp")) File.Delete(path + ".tmp"); } catch { }
             return false;
         }
     }

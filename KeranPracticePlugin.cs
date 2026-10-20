@@ -11,7 +11,7 @@ namespace KeranPractice;
 public sealed class KeranPracticePlugin : BasePlugin
 {
     public override string ModuleName => "KeranPractice";
-    public override string ModuleVersion => "1.0.0";
+    public override string ModuleVersion => "1.0.1";
     public override string ModuleAuthor => "Keran Technology";
     public override string ModuleDescription => "CS2 社区训练插件：道具、站位、闪光免疫、BOT 训练";
 
@@ -47,6 +47,8 @@ public sealed class KeranPracticePlugin : BasePlugin
         // 首次运行写默认配置
         if (!File.Exists(_configPath)) JsonStore.Save(_configPath, Config);
 
+        MigrateLegacyData(_dataDir);
+
         Permissions = new PermissionService(Config);
         Flash = new FlashSystem(this);
         Positions = new PositionSystem(this, _dataDir);
@@ -56,7 +58,6 @@ public sealed class KeranPracticePlugin : BasePlugin
 
         RegisterEventHandler<EventPlayerBlind>(OnPlayerBlind);
         RegisterEventHandler<EventGrenadeThrown>(Grenades.OnGrenadeThrown);
-        RegisterListener<Listeners.OnEntitySpawned>(Grenades.OnEntitySpawned);
         RegisterEventHandler<EventBulletImpact>(Tools.OnBulletImpact);
         RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
         RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
@@ -87,6 +88,32 @@ public sealed class KeranPracticePlugin : BasePlugin
         States.Clear();
         Tools.Reset();
         Console.WriteLine("[KeranPractice] 已卸载");
+    }
+
+    /// <summary>
+    /// v1.0.0 把存档放在插件目录内（升级/重装会丢）。这里把旧文件复制到新目录，
+    /// 原文件保留不删，方便回滚；新目录已有同名文件时不覆盖。
+    /// </summary>
+    private void MigrateLegacyData(string newDir)
+    {
+        var legacyDir = Path.Combine(ModuleDirectory, "data");
+        if (!Directory.Exists(legacyDir)) return;
+
+        foreach (var name in new[] { "positions.json", "nades.json" })
+        {
+            var src = Path.Combine(legacyDir, name);
+            var dst = Path.Combine(newDir, name);
+            if (!File.Exists(src) || File.Exists(dst)) continue;
+            try
+            {
+                File.Copy(src, dst, overwrite: false);
+                Console.WriteLine($"[KeranPractice] 已迁移旧存档 {name} → {dst}（原文件保留）");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[KeranPractice] 迁移旧存档 {name} 失败: {ex.Message}");
+            }
+        }
     }
 
     // ---------- 状态 ----------
@@ -148,6 +175,7 @@ public sealed class KeranPracticePlugin : BasePlugin
         AddTimer(0.2f, () =>
         {
             if (player == null || !player.IsValid) return;
+            if (!IsCurrentSession(st, Server.MapName)) return;   // 期间断线/重连过，别用旧状态覆盖新角色
             var pawn = player.PlayerPawn.Value;
             if (pawn == null || !pawn.IsValid) return;
 
@@ -215,6 +243,20 @@ public sealed class KeranPracticePlugin : BasePlugin
             "off" or "0" or "false" or "关" => false,
             _ => null,
         };
+
+    // ---------- 测试脚手架（仅 KPTEST 构建） ----------
+
+#if KPTEST
+    [ConsoleCommand("css_kptest", "测试脚手架：用 BOT 驱动功能验证")]
+    [CommandHelper(minArgs: 1, usage: "<pos|god|noclip|flash|clear|iso|bot>", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
+    public void OnTest(CCSPlayerController? player, CommandInfo command)
+    {
+        var scenario = Arg(command, 1);
+        Console.WriteLine($"[KPTEST] begin {scenario}");
+        try { TestHarness.Run(this, scenario); }
+        catch (Exception ex) { Console.WriteLine($"[KPTEST] EX {ex}"); }
+    }
+#endif
 
     // ---------- P0 ----------
 

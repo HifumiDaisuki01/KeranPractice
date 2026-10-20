@@ -197,5 +197,14 @@ public sealed class PositionSystem
     }
 
     public static void Reply(CCSPlayerController player, string msg)
-        => player.PrintToChat($" {ChatColors.Green}[训练]{ChatColors.Default} {msg}");
+    {
+        if (player == null || !player.IsValid) return;
+        // BOT 没有客户端连接，PrintToChat 会打到空指针上；改走日志，避免服务端异常。
+        if (player.IsBot)
+        {
+            Console.WriteLine($"[KeranPractice] (bot slot {player.Slot}) {msg}");
+            return;
+        }
+        player.PrintToChat($" {ChatColors.Green}[训练]{ChatColors.Default} {msg}");
+    }
 }

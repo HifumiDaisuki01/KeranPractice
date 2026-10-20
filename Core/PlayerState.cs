@@ -27,6 +27,11 @@ public sealed class PlayerState
     /// <summary>最近一次投掷。</summary>
     public GrenadeRecord? LastGrenade { get; set; }
 
+    /// <summary>正在等待 !rethrow 的真实投掷事件回执。</summary>
+    public bool RethrowPending { get; set; }
+    public string RethrowExpectedType { get; set; } = "";
+    public DateTime RethrowRequestedAt { get; set; } = DateTime.MinValue;
+
     /// <summary>指令冷却。</summary>
     public DateTime LastCommandAt { get; set; } = DateTime.MinValue;
 
@@ -48,6 +53,8 @@ public sealed class PlayerState
         PreviousMoveType = null;
         Practice = false;
         LastGrenade = null;
+        RethrowPending = false;
+        RethrowExpectedType = "";
         FocusBot = null;
         OwnedBots.Clear();
         OwnedBotHandles.Clear();

@@ -17,7 +17,8 @@ public sealed class BotSystem
     private bool Available(CCSPlayerController p)
     {
         if (_plugin.Permissions.EnableBotManagement) return true;
-        PositionSystem.Reply(p, "BOT 管理已安全禁用；仅在独立测试服显式开启 EnableBotManagement。");
+        // 全局熔断，管理员也不例外：本服与 KeranStrat(KSD/KSV) 共用 BOT 池。
+        PositionSystem.Reply(p, "BOT 管理已安全禁用（与 KeranStrat 共用 BOT 池）；仅在独立测试服显式开启 EnableBotManagement。");
         return false;
     }
 
@@ -64,11 +65,19 @@ public sealed class BotSystem
 
             var added = after.Where(p => !before.Contains(p.UserId ?? 0)).ToList();
             if (!_plugin.IsCurrentSession(st, map) || player == null || !player.IsValid) return;
-            if (added.Count != 1)
+
+            if (added.Count == 0)
             {
-                PositionSystem.Reply(player, "无法唯一识别本次创建的 BOT，拒绝认领；请在独立训练服重试。");
+                PositionSystem.Reply(player, "BOT 添加失败（可能已达上限，或服务器未启用 BOT）。");
                 return;
             }
+            if (added.Count != 1)
+            {
+                // 同时冒出多个 BOT（其他插件/其他玩家也在加）时无法安全判断归属，直接放弃认领。
+                PositionSystem.Reply(player, $"检测到 {added.Count} 个新 BOT，无法唯一确认归属，已放弃认领。");
+                return;
+            }
+
             foreach (var b in added)
             {
                 var id = b.UserId ?? 0;
@@ -78,14 +87,7 @@ public sealed class BotSystem
                 st.FocusBot = id;
             }
 
-            if (added.Count == 0)
-            {
-                PositionSystem.Reply(player, "BOT 添加失败（可能已达上限或服务器未启用 BOT）。");
-            }
-            else
-            {
-                PositionSystem.Reply(player, $"已添加 {added.Count} 个 BOT（{(team == "t" ? "T" : team == "ct" ? "CT" : "自动")}），当前指向最后一个。");
-            }
+            PositionSystem.Reply(player, $"已添加 1 个 BOT（{(team == "t" ? "T" : team == "ct" ? "CT" : "自动")}），当前指向它。");
         });
     }
 

@@ -27,21 +27,10 @@ public sealed class GrenadeRecord
     [JsonPropertyName("z")] public float Z { get; set; }
     [JsonPropertyName("pitch")] public float Pitch { get; set; }
     [JsonPropertyName("yaw")] public float Yaw { get; set; }
-    [JsonPropertyName("holdMs")] public int HoldMs { get; set; } = 120;
-    public bool HasProjectileSnapshot { get; set; }
-    public ushort ItemIndex { get; set; }
-    public float ProjectileX { get; set; }
-    public float ProjectileY { get; set; }
-    public float ProjectileZ { get; set; }
-    public float VelocityX { get; set; }
-    public float VelocityY { get; set; }
-    public float VelocityZ { get; set; }
-    public float AngleX { get; set; }
-    public float AngleY { get; set; }
-    public float AngleZ { get; set; }
-    public float AngularVelocityX { get; set; }
-    public float AngularVelocityY { get; set; }
-    public float AngularVelocityZ { get; set; }
+    /// <summary>投掷瞬间玩家的移动速度（跳投/跑投的惯性）。</summary>
+    [JsonPropertyName("velX")] public float VelX { get; set; }
+    [JsonPropertyName("velY")] public float VelY { get; set; }
+    [JsonPropertyName("velZ")] public float VelZ { get; set; }
     [JsonPropertyName("thrownAt")] public DateTime ThrownAt { get; set; } = DateTime.UtcNow;
 }
 
@@ -57,7 +46,6 @@ public sealed class SavedNade
     [JsonPropertyName("z")] public float Z { get; set; }
     [JsonPropertyName("pitch")] public float Pitch { get; set; }
     [JsonPropertyName("yaw")] public float Yaw { get; set; }
-    [JsonPropertyName("holdMs")] public int HoldMs { get; set; } = 120;
     [JsonPropertyName("savedAt")] public DateTime SavedAt { get; set; } = DateTime.UtcNow;
 }
 

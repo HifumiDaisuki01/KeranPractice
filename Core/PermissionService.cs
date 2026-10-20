@@ -114,11 +114,9 @@ public sealed class PermissionService
     public float AutoClearDelaySeconds => _config.AutoClearDelaySeconds;
     public bool AutoClearDefault => _config.AutoClearDefault;
     public bool GodModeDefault => _config.GodModeDefault;
-    public float ImpactMarkerSeconds => _config.ImpactMarkerSeconds;
-    public int MaxImpactMarkers => _config.MaxImpactMarkers;
+    public int RethrowHoldMs => _config.RethrowHoldMs;
+    public bool AutoThrowOnRethrow => _config.AutoThrowOnRethrow;
+    public bool ReturnAfterRethrow => _config.ReturnAfterRethrow;
     public int MaxPositionsPerMap => _config.MaxPositionsPerMap;
     public int MaxNadesPerMap => _config.MaxNadesPerMap;
-    public bool TeleportOnRethrow => _config.TeleportOnRethrow;
-    public int RethrowHoldMs => _config.RethrowHoldMs;
-    public string ConsoleSteamId => _config.ConsoleSteamId;
 }
