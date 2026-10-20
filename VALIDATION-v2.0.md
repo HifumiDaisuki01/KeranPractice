@@ -1,8 +1,27 @@
 # KeranPractice v2.0 验证记录
 
-状态：**Phase 1 审查构建。未完成真人验收，不是正式2.0 Release，不替换正式服v1.x。**
+状态：**Phase 2 审查构建，已按服主授权热更新主服。Phase 1 核心收到服主真人正常反馈；新增功能尚待逐项真人验收。未发布正式 Release。**
 
-## 实际环境
+
+## 最新进度：Phase 1 真人反馈、道具补充与 Phase 2
+
+- 服主在本次会话明确反馈“完美！全部正常工作”。记作 Phase 1 核心真人反馈；没有获得每种按键、跑跳投、双人火区清理的逐项测量，不将其推断为全部专项通过。下方初始夹具/历史记录保留其原测试边界。
+- 主服已授权使用热卸载/加载部署，无 CS2 重启，无地图/模式/启动参数修改。隔离实例停止并删除（约139MiB），后续没有创建新测试实例。
+- 道具补充：真实捕获后0.65秒，原连接+Pawn+队伍+会话+模式二次检查；重投不触发；只写真实手雷VData指定的弹药槽。KS/KSV自动补充禁用，手动补齐允许；KSD和未知状态禁用。单测覆盖模式矩阵与道具类型，不能代替真人库存测试。
+- 原生捕获/工厂的算法与签名未变。道具库保留原快照，加载后重投仍使用当前玩家作为投掷者，不修改原历史；新真实投掷取消选择。
+- noflash和原位置传送的底层行为保留。退出新增恢复本插件更改的飞行/伤害状态，不替其他插件重置全局规则。
+- 48项单元测试通过，Phase2编译零警告/零错误；新增实际游戏行为暂标“尚未验证”。
+
+### 新功能真人验收步骤
+
+1. `!practice on`，普通KP会话投烟/双闪/HE/火/诱饵，观察补回；枪械射击/换弹仍消耗。KS/KSV同样投掷应消耗，只有 `!nadesupply` 手动补；KSD命令应拒绝。
+2. 真实投烟 `!savenade A`，走远、重连后 `!practice on`、`!loadnade A` 返回站位，走远 `!rethrow`；核对烟雾。新投HE后 `!rethrow` 应重投HE。
+3. 另一玩家不能列出、加载、删除A；另一个地图隔离；同名覆盖不增加数量；重启持久化测试仅在用户许可维护时进行。
+4. 管理员 `!noclip on/off` 检查飞行和落地；`!god on/off` 检查伤害状态恢复；`!practice off`、切队、死亡、回合结束检查恢复；普通玩家不得获得这两项权限。
+5. 死亡T/CT `!respawn`，存活拒绝；KSD禁止复活。`!spawn` / `!tspawn 1` / `!ctspawn 1`，位置与视角恢复、无惯性、!back往返；序号越界拒绝。
+6. 与KeranStrat并行录制/回放；KSD CT死亡不提前复活、BOT不被修改。需要真实联机验证，未用命令注册代替通过。
+
+## 初始 Phase 1 测试环境（历史记录）
 
 - 正式服只读核查：Linux Debian12、CS2 1.41.9.1/14191、CSS 1.0.376 (653d651)、随CSS安装的.NET10.0.3。
 - 构建SDK .NET10.0.402，CSS API NuGet固定1.0.376。编译结果零错误/零警告。
@@ -21,11 +40,11 @@
 | clearall | 仅管理员；跳过BOT/外部标签/未知归属，避免破坏KSD | 是 | 是 | 权限单测通过；全图无条件删除刻意不支持；实际多插件并行待验收 | 尚未验证 |
 | autoclear | 延迟清理本人旧批次，新批次不选中；取消与代次检查 | 是 | 是 | 批次/连接/地图选择单测通过；实际延迟清理待验收 | 尚未验证 |
 | practice/phelp | 个人会话与中文帮助，不更改全局模式；所有者先批准公共训练 | 是 | 是 | 授权策略单测通过；真实玩家退出状态待验收 | 尚未验证 |
-| savenade/loadnade等 | 未开放；旧站位不足以伪造完整物理记录 | 否 | 否 | 尚未实现，Phase2不掩盖Phase1缺口 | 尚未验证 |
-| god/noclip/respawn/spawn | 未开放 | 否 | 否 | Phase2待核心真人验收后继续 | 尚未验证 |
+| savenade/loadnade/nades/delnade | 完整快照持久化、SteamID+地图隔离、64条默认上限、同名覆盖、load返回站位并选中 | 是 | 见最新部署记录 | 9项存储/迁移/重启/隔离测试通过 | 尚未验证 |
+| god/noclip/respawn/spawn | Pawn句柄绑定、权限、原状态恢复；KSD禁止 | 是 | 见最新部署记录 | 编译通过，实际移动/伤害/复活/传送待真人测试 | 尚未验证 |
 | BOT/impacts/轨迹可视化 | 未开放；诊断轨迹JSON不算3D可视化 | 否 | 否 | Phase3；BOT管理实际禁用 | 尚未验证 |
 
-自动测试26项全部通过；证据见research/evidence/core.trx和构建日志。单测不是引擎或真人验证。
+初始自动测试26项全部通过；证据见research/evidence/core.trx和构建日志。单测不是引擎或真人验证。
 
 ## 原生投掷集成证据
 
@@ -63,4 +82,12 @@
 
 ## 最终构建复测
 
-最终DLL SHA256：`dd4e7bca5f786c0dabc42d42eb2f026454f71caa98f5a6f917c3795a6195e850`。十项工厂夹具全部有对应引爆/效果事件；五个同状态重复样本终点差为0。两次烟雾均DidSmokeEffect=true，两次闪光均有player_blind，两次HE均有health damage，两次燃烧弹均有火区与伤害，诱饵均decoy_started。详见research/evidence/native-fixture-final.json；它明确RealHumanThrows=false。正式服旧DLL和配置hash保持，见isolation-and-environment.json。
+初始Phase1最终DLL SHA256：`dd4e7bca5f786c0dabc42d42eb2f026454f71caa98f5a6f917c3795a6195e850`。十项工厂夹具全部有对应引爆/效果事件；五个同状态重复样本终点差为0。两次烟雾均DidSmokeEffect=true，两次闪光均有player_blind，两次HE均有health damage，两次燃烧弹均有火区与伤害，诱饵均decoy_started。详见research/evidence/native-fixture-final.json；它明确RealHumanThrows=false。该夹具执行时正式服旧DLL和配置hash保持，见isolation-and-environment.json；后续已按授权热更新主服。
+
+## Phase 2 主服部署检查
+
+- 加载版本 `2.0.0-phase2-review`；`kpv2_status`：native=ready，bots=disabled。
+- 12个插件均LOADED，包括KeranStrat0.5.5、模型插件和其余既有插件；`sv_infinite_ammo=0`。
+- 只读检查时用户实际正在KSD运行中的会话，`kpv2_supply_status`返回manualBlocked=True、autoBlocked=True，与KSD状态一致。未为测试强制结束该会话或改变地图/模式。
+- 新增命令通过AddCommand注册且插件加载正常；逐项真人调用结果仍待验收，不能据此标为功能通过。
+- 主服保留部署前的插件、配置、data备份；未复制游戏、运行时或创建第二实例。

@@ -18,6 +18,7 @@ public sealed class PrivateStore
         _file=file;Data=File.Exists(file)?JsonSerializer.Deserialize<Archive>(File.ReadAllText(file),Options)??throw new InvalidDataException("Empty archive"):new();
         if (Data.Version!=2) throw new InvalidDataException("Unsupported data version; original file preserved");
         foreach(var e in Data.Positions) Validate(e);
+        foreach(var e in Data.Lineups) ValidateLineup(e);
     }
     private static void Validate(PositionEntry e)
     {
@@ -35,6 +36,24 @@ public sealed class PrivateStore
     public void Delete(ulong id,string map,string name)
     {
         var entry=Get(id,map,name);var list=Data.Positions.ToList();list.Remove(entry);Commit(new Archive{Positions=list,Lineups=Data.Lineups});
+    }
+    private static void ValidateLineup(LineupEntry e)
+    {
+        Inputs.Name(e.Name);e.Throw.Validate();
+        if(e.SteamId!=e.Throw.SteamId)throw new InvalidDataException("道具归属不一致");
+    }
+    public IReadOnlyList<LineupEntry> Lineups(ulong id,string map)=>Data.Lineups.Where(e=>e.SteamId==id&&e.Throw.Map==map).ToArray();
+    public LineupEntry GetLineup(ulong id,string map,string name)=>Lineups(id,map).FirstOrDefault(e=>e.Name.Equals(Inputs.Name(name),StringComparison.OrdinalIgnoreCase))??throw new InvalidOperationException("没有该私有道具");
+    public void SaveLineup(LineupEntry entry,int limit)
+    {
+        entry=entry with{Name=Inputs.Name(entry.Name)};ValidateLineup(entry);
+        var list=Data.Lineups.ToList();var old=Lineups(entry.SteamId,entry.Throw.Map).FirstOrDefault(e=>e.Name.Equals(entry.Name,StringComparison.OrdinalIgnoreCase));
+        if(old==null&&Lineups(entry.SteamId,entry.Throw.Map).Count>=Math.Clamp(limit,1,256))throw new InvalidOperationException("道具存档数量达到上限");
+        if(old!=null)list.Remove(old);list.Add(entry);Commit(new Archive{Positions=Data.Positions,Lineups=list});
+    }
+    public void DeleteLineup(ulong id,string map,string name)
+    {
+        var entry=GetLineup(id,map,name);var list=Data.Lineups.ToList();list.Remove(entry);Commit(new Archive{Positions=Data.Positions,Lineups=list});
     }
     private void Commit(Archive next)
     {

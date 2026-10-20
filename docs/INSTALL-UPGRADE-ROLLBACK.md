@@ -1,12 +1,12 @@
 # 安装、迁移和回滚
 
-这是 rewrite/v2.0 的 Phase 1 审查构建，不是已完成真人验收的正式2.0发行。
+这是 rewrite/v2.0 的 Phase 2 审查构建，不是已完成真人验收的正式2.0发行。
 
 ## 安装
 
-1. Linux CS2 + CSS 1.0.376 / .NET10；先用独立测试实例，不直接替换繁忙正式服。Windows原生重投未验证，自动禁用。
+1. Linux CS2 + CSS 1.0.376 / .NET10；按服主批准的维护窗口部署；本次按服主要求直接热更新主服，不复制游戏或运行时。Windows原生重投未验证，自动禁用。
 2. 备份现有 `addons/counterstrikesharp/plugins/KeranPractice/` 与 `configs/plugins/KeranPractice/`，包括全部data。不要同时加载旧新两个插件，否则相同命令会冲突。
-3. 测试实例停服，解压ZIP的game/csgo/到对应游戏目录；插件文件为KeranPractice.dll、KeranPractice.Core.dll和deps.json，模块内gamedata/keranpractice-v2.json必须一起复制。无需新增自编译.so，但重投确实调用CSS封装的原生引擎函数，绝非纯托管仿真。
+3. 先 `css_plugins unload KeranPractice`，解压ZIP的game/csgo/到对应游戏目录；插件文件为KeranPractice.dll、KeranPractice.Core.dll和deps.json，模块内gamedata/keranpractice-v2.json必须一起复制；然后 `css_plugins load KeranPractice`。无需新增自编译.so，但重投确实调用CSS封装的原生引擎函数，绝非纯托管仿真。
 4. 配置新 `ConfigVersion:2`，填写Admins里的SteamID64。`TrainingEnvironmentApproved` 默认false；只有服务器所有者明确认定训练环境后才设true，普通玩家仍需个人practice会话及允许的个人命令。
 5. 控制台 `kpv2_status` 应显示native ready或明确disabled原因。native禁用时noflash/位置可继续使用；没有签名不猜地址、不模拟鼠标、不退回CreateEntityByName。
 6. 真人先 !practice on，再按VALIDATION-v2.0.md测试矩阵。日志和诊断路径在插件data目录。未取得真人记录不得宣称核心验收完成。
@@ -15,7 +15,7 @@
 
 旧版PublicCommands、AdminOnlyCommands、AllowRoundRestart等危险授权不用于v2。
 旧Admins白名单可保留，但ConfigVersion<2时公共命令授权被关闭。
-高风险clearall、god/noclip、BOT/回合命令即使写入PublicPersonalCommands也不能获得公共权限。当前构建未注册BOT/god/noclip/回合命令。
+高风险clearall、god/noclip、BOT/回合命令即使写入PublicPersonalCommands也不能获得公共权限。当前已注册管理员god/noclip；BOT/回合命令未注册。
 
 ## 数据迁移
 
@@ -26,10 +26,16 @@ v2写入 `plugins/KeranPractice/data/archive-v2.json`，不覆盖旧positions.js
 
 ## 回滚
 
-测试实例停服；把新插件目录移到备份位置，恢复旧DLL/deps/配置与原data；保留v2 archive-v2.json供日后继续测试，不覆盖旧数据。恢复后启动并检查旧插件版本。
-本次隔离测试无需回滚正式服：正式服旧DLL和规则未改，KeranStrat源码/配置/战术数据未动。
+先卸载KeranPractice；备份当前data，再恢复旧DLL/deps/配置。不要用旧备份覆盖新保存的archive-v2.json；回退v1时保留v2存档供以后使用。重新加载并检查旧插件版本。
+主服已有部署前备份及 `/root/keranpractice-v2-main-deploy/rollback.sh`（回退v1）和 `rollback-phase2.sh`（回退Phase1+补充）。本次未修改KeranStrat源码/配置/战术数据。
 
 ## 更新游戏后
 
 gamedata/keranpractice-v2.json是本插件私有的版本审计manifest，不是可随意放进CSS全局gamedata目录的通用JSON。
 它包括Linux server二进制SHA256、每个签名及唯一匹配的文件偏移。游戏更新即停止原生重投；重新审计ELF可执行区、参数ABI和隔离引爆/伤害后再更新，不能只把新hash写进去。
+
+## Phase 2 存档升级
+
+archive-v2结构保持Version2，原Positions及已有Lineups均保留；旧v2没有Lineups字段时按空列表读取。MaxLineupsPerMap默认64。公共个人命令需要加入PublicPersonalCommands；不要给普通玩家god/noclip/clearall。
+
+`!loadnade`会返回保存站位并选中完整快照，`!rethrow`不移动玩家。`!last`仍返回最近真实投掷站位。

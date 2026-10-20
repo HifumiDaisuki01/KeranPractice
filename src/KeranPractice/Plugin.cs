@@ -13,8 +13,9 @@ public sealed class PracticeConfig : BasePluginConfig
     public override int Version {get;set;}=2;
     public List<string> Admins {get;set;}=[];
     public bool TrainingEnvironmentApproved {get;set;}
-    public List<string> PublicPersonalCommands {get;set;}=["noflash","savepos","tp","poslist","delpos","last","back","rethrow","clear","autoclear"];
+    public List<string> PublicPersonalCommands {get;set;}=["noflash","savepos","tp","poslist","delpos","last","back","rethrow","clear","autoclear","nadesupply","savenade","loadnade","nades","delnade","respawn","spawn","tspawn","ctspawn"];
     public int MaxPositionsPerMap {get;set;}=64;
+    public int MaxLineupsPerMap {get;set;}=64;
     public float AutoClearDelaySeconds {get;set;}=3;
     public bool EnableNativeReplay {get;set;}=true;
     public int MaxTrackedEntities {get;set;}=256;
@@ -25,11 +26,15 @@ public sealed class Session(Owner owner,uint controller)
     public uint Controller {get;}=controller;
     public bool Active {get;set;}
     public bool NoFlash {get;set;}
+    public bool SupplyEnabled {get;set;}=true;
+    public List<Timer> SupplyTasks {get;}=[];
     public bool AutoClear {get;set;}
     public float AutoClearDelay {get;set;}=3;
     public double LastReplayTime {get;set;}=double.NegativeInfinity;
     public long Batch {get;set;}
     public History History {get;}=new(64);
+    public ThrowSnapshot? SelectedLineup {get;set;}
+    public PlayerToolState Tools {get;}=new();
     public TeleportToggle Back {get;}=new();
     public Timer? PendingClear {get;set;}
 }
@@ -37,7 +42,7 @@ public sealed class Session(Owner owner,uint controller)
 public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<PracticeConfig>
 {
     public override string ModuleName=>"KeranPractice";
-    public override string ModuleVersion=>"2.0.0";
+    public override string ModuleVersion=>"2.0.0-phase2-review";
     public override string ModuleAuthor=>"Keran Technology © 2026";
     public override string ModuleDescription=>"Independent practice rewrite; native physics replay";
     public PracticeConfig Config {get;set;}=new();
@@ -54,7 +59,7 @@ public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<Pract
     public void OnConfigParsed(PracticeConfig config)
     {
         Config=config;_policy=new AccessPolicy {Admins=config.Admins.Select(s=>ulong.TryParse(s,out var v)?v:0).Where(v=>v!=0).ToHashSet(),TrainingEnvironmentApproved=config.Version>=2&&config.TrainingEnvironmentApproved,Public=config.Version>=2?config.PublicPersonalCommands.ToHashSet(StringComparer.Ordinal):[]};
-        Config.AutoClearDelaySeconds=float.IsFinite(Config.AutoClearDelaySeconds)?Math.Clamp(Config.AutoClearDelaySeconds,.1f,120):3;Config.MaxTrackedEntities=Math.Clamp(Config.MaxTrackedEntities,16,512);Config.MaxPositionsPerMap=Math.Clamp(Config.MaxPositionsPerMap,1,256);
+        Config.AutoClearDelaySeconds=float.IsFinite(Config.AutoClearDelaySeconds)?Math.Clamp(Config.AutoClearDelaySeconds,.1f,120):3;Config.MaxTrackedEntities=Math.Clamp(Config.MaxTrackedEntities,16,512);Config.MaxPositionsPerMap=Math.Clamp(Config.MaxPositionsPerMap,1,256);Config.MaxLineupsPerMap=Math.Clamp(Config.MaxLineupsPerMap,1,256);
     }
     public override void Load(bool hotReload)
     {
@@ -62,9 +67,9 @@ public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<Pract
         var legacy=Path.Combine(ModuleDirectory,"data/positions.json");var imported=_store.ImportLegacy(legacy);if(imported>0)Logger.LogInformation("Imported {Count} legacy positions; source retained",imported);
         _native.Created+=Capture;
         if(Config.EnableNativeReplay)_native.Initialize(Path.Combine(ModuleDirectory,"gamedata/keranpractice-v2.json"));
-        foreach(var cmd in new[]{"practice","phelp","noflash","savepos","tp","poslist","delpos","last","back","rethrow","clear","clearall","autoclear"})
+        foreach(var cmd in new[]{"practice","phelp","noflash","savepos","tp","poslist","delpos","last","back","rethrow","clear","clearall","autoclear","nadesupply","savenade","loadnade","nades","delnade","noclip","god","respawn","spawn","tspawn","ctspawn"})
         {var name=cmd;AddCommand("css_"+name,"KeranPractice v2: "+name,(player,args)=>Execute(name,player,args));}
-        AddCommand("kpv2_status","Read-only diagnostics",(_,cmd)=>cmd.ReplyToCommand($"KeranPractice 2.0.0; native={_native.Status}; sessions={_sessions.Count}; bots=disabled; dataVersion=2"));
+        AddCommand("kpv2_status","Read-only diagnostics",(_,cmd)=>cmd.ReplyToCommand($"KeranPractice 2.0.0-phase2-review; native={_native.Status}; sessions={_sessions.Count}; bots=disabled; dataVersion=2"));
         RegisterEventHandler<EventPlayerBlind>((e,_)=>{if(e.Userid is {} p&&_sessions.TryGetValue(p.SteamID,out var s)&&s.NoFlash)ClearFlash(p);return HookResult.Continue;},HookMode.Pre);
         RegisterListener<Listeners.OnClientDisconnect>(slot=>{if(_slots.Remove(slot,out var id))Exit(id);});
         RegisterListener<Listeners.OnMapStart>(_=>ResetMap());
@@ -72,7 +77,8 @@ public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<Pract
         RegisterEventHandler<EventRoundEnd>((_,_)=>{CancelRoundWork();return HookResult.Continue;});
         RegisterListener<Listeners.OnEntitySpawned>(ObserveSpawn);
         RegisterListener<Listeners.OnEntityDeleted>(e=>_ledger.Remove(e.EntityHandle.Raw));
-        RegisterEffects();RegisterProbe();
+        AddCommand("kpv2_supply_status","Read-only supply isolation diagnostics",(_,cmd)=>cmd.ReplyToCommand($"supply manualBlocked={DefenseBlocksTools()}; autoBlocked={DefenseBlocksTools(true)}; KS/KSV manual-only; KSD blocked"));
+        RegisterToolsLifecycle();RegisterEffects();RegisterProbe();
         Logger.LogInformation("KeranPractice v2 loaded; {Native}; old architecture not loaded",_native.Status);
     }
     private Session SessionFor(CCSPlayerController p)
@@ -99,18 +105,29 @@ public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<Pract
         try
         {
             var s=SessionFor(p);
-            if(command=="phelp"){Say(p,"!practice on/off；!noflash；!savepos [名] / !tp [名] / !poslist / !delpos 名；!last 返回上次投掷站位；!back 往返上次传送；!rethrow 原地不动重投；!clear 清理自己的道具；!autoclear on/off [秒]；管理员 !clearall。BOT、弹着点与其他工具尚未开放。");return;}
+            if(command=="phelp")
+            {
+                Say(p,"训练：!practice on/off | !noflash [on/off] | !nadesupply [on/off]（KS/KSV 仅手动补齐）");
+                Say(p,"位置：!savepos 名 / !tp 名 / !poslist / !delpos 名；!last 返回上次真实投掷站位；!back 往返传送");
+                Say(p,"道具：!rethrow 重投已选道具或最新投掷；!clear；!autoclear on/off [秒]；管理员 !clearall");
+                Say(p,"私有道具库：!savenade 名 / !loadnade 名（选中并返回站位）/ !nades / !delnade 名；新投掷取消选中");
+                Say(p,"工具：!respawn / !spawn [序号] / !tspawn [序号] / !ctspawn [序号]；管理员 !noclip / !god [on/off]。BOT 未开放。");return;
+            }
             if(command=="practice")
             {
                 if(!_policy.Admins.Contains(p.SteamID)&&!_policy.TrainingEnvironmentApproved)throw new InvalidOperationException("服务器尚未授权公共训练环境，请联系管理员");
                 var arg=cmd.ArgCount>1?cmd.GetArg(1):s.Active?"off":"on";if(arg is not ("on" or "off"))throw new ArgumentException("用法 !practice on/off");
-                if(arg=="off"){Exit(p.SteamID);Say(p,"已退出训练，已取消个人任务和免闪；未更改全局游戏模式");return;}s.Active=true;Say(p,"已进入个人训练会话");return;
+                if(arg=="off"){Exit(p.SteamID);Say(p,"已退出训练，已恢复个人临时状态并取消任务；未更改全局游戏模式");return;}s.Active=true;Say(p,"已进入个人训练会话");return;
             }
             if(!_policy.Allows(p.SteamID,command,s.Active))throw new InvalidOperationException("无权限，或尚未进入服务器已授权的训练会话");
+            if(command=="nadesupply"&&!_policy.Admins.Contains(p.SteamID)&&!_policy.TrainingEnvironmentApproved)throw new InvalidOperationException("未授权训练环境");
             if(!s.Active)throw new InvalidOperationException("请先 !practice on");
             var name=cmd.ArgCount>1?Inputs.Name(cmd.GetArg(1)):"default";
             switch(command)
             {
+                case "savenade":case "loadnade":case "nades":case "delnade":LineupCommand(command,p,s,cmd);break;
+                case "noclip":case "god":case "respawn":case "spawn":case "tspawn":case "ctspawn":ToolCommand(command,p,s,cmd);break;
+                case "nadesupply":SupplyCommand(p,s,cmd);break;
                 case "noflash":if(cmd.ArgCount>1&&cmd.GetArg(1) is not ("on" or "off"))throw new ArgumentException("用法 !noflash [on/off]");s.NoFlash=cmd.ArgCount>1?cmd.GetArg(1)=="on":!s.NoFlash;if(s.NoFlash){ClearFlash(p);EnsureFlashTimer();}Say(p,s.NoFlash?"个人免闪开启":"个人免闪关闭");break;
                 case "savepos":_store.Save(new(p.SteamID,name,Standing(p)),Config.MaxPositionsPerMap);Say(p,"已保存私人位置 "+name);break;
                 case "tp":var before=Standing(p);var pos=_store.Get(p.SteamID,Server.MapName,name).Position;Teleport(p,pos);s.Back.Remember(before);Say(p,"已传送 "+name);break;
@@ -131,8 +148,8 @@ public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<Pract
     {
         _flashTimer??=AddTimer(.1f,()=>{foreach(var (id,s) in _sessions.ToArray())if(s.NoFlash&&Utilities.GetPlayerFromSteamId(id) is {} p&&Current(p,s))ClearFlash(p);if(!_sessions.Values.Any(s=>s.NoFlash)){_flashTimer?.Kill();_flashTimer=null;}},TimerFlags.REPEAT);
     }
-    private void Exit(ulong id){foreach(var slot in _slots.Where(e=>e.Value==id).Select(e=>e.Key).ToArray())_slots.Remove(slot);if(_sessions.Remove(id,out var s)){s.PendingClear?.Kill();ClearOwned(s.Owner);s.NoFlash=false;foreach(var key in _pawnOwners.Where(e=>e.Value==s.Owner).Select(e=>e.Key).ToArray())_pawnOwners.Remove(key);}}
-    private void CancelRoundWork(){foreach(var s in _sessions.Values){s.PendingClear?.Kill();s.PendingClear=null;}_ledger.Clear();_pawnOwners.Clear();ClearObservations();}
-    private void ResetMap(){_epoch++;CancelRoundWork();_sessions.Clear();_slots.Clear();_flashTimer?.Kill();_flashTimer=null;}
-    public override void Unload(bool hotReload){ResetMap();_native.Dispose();_trajectoryTimer?.Kill();}
+    private void Exit(ulong id){foreach(var slot in _slots.Where(e=>e.Value==id).Select(e=>e.Key).ToArray())_slots.Remove(slot);if(_sessions.Remove(id,out var s)){RestoreTools(s);s.PendingClear?.Kill();CancelSupply(s);ClearOwned(s.Owner);s.NoFlash=false;foreach(var key in _pawnOwners.Where(e=>e.Value==s.Owner).Select(e=>e.Key).ToArray())_pawnOwners.Remove(key);}}
+    private void CancelRoundWork(){foreach(var s in _sessions.Values){RestoreTools(s);s.PendingClear?.Kill();s.PendingClear=null;CancelSupply(s);}_ledger.Clear();_pawnOwners.Clear();ClearObservations();}
+    private void ResetMap(){foreach(var s in _sessions.Values){RestoreTools(s);CancelSupply(s);}_epoch++;CancelRoundWork();_sessions.Clear();_slots.Clear();_flashTimer?.Kill();_flashTimer=null;}
+    public override void Unload(bool hotReload){ResetMap();_native.Dispose();_trajectoryTimer?.Kill();_toolTimer?.Kill();}
 }

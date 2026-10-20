@@ -28,7 +28,7 @@ public sealed partial class KeranPracticePlugin
                 var entity=Resolve<CBaseCSGrenadeProjectile>(raw);
                 if(entity is not {IsValid:true}||Foreign(entity))return;
                 var spin=Angle(entity.AngVelocity);var actual=shot with {AngularVelocity=spin,GravityScale=entity.GravityScale,Elasticity=entity.Elasticity};actual.Validate();
-                session.History.Capture(actual,false);long previous=session.Batch;session.Batch++;
+                session.SelectedLineup=null;session.History.Capture(actual,false);ScheduleSupply(player,session,actual);long previous=session.Batch;session.Batch++;
                 _pawnOwners[shot.OriginalPawn]=session.Owner;
                 Track(entity,session.Owner,session.Batch,actual,false);
                 ScheduleClear(player,session,previous);
@@ -41,7 +41,7 @@ public sealed partial class KeranPracticePlugin
     {
         if(_observations.Count>=Config.MaxTrackedEntities)throw new InvalidOperationException("跟踪数量达到上限，请先 !clear");
         if(Server.CurrentTime-session.LastReplayTime<.2)throw new InvalidOperationException("重投过快，请稍等");session.LastReplayTime=Server.CurrentTime;
-        var original=session.History.Last??throw new InvalidOperationException("没有可重演的真实投掷物记录；先正常投出一颗道具");
+        var original=session.SelectedLineup??session.History.Last??throw new InvalidOperationException("没有可重演的真实投掷物记录；先正常投出一颗道具");
         if(original.Map!=Server.MapName)throw new InvalidOperationException("投掷记录地图不匹配");
         var pawn=Pawn(p);var shot=original with {Team=p.TeamNum,OriginalPawn=p.PlayerPawn.Raw};long previous=session.Batch;
         var grenade=_native.Create(shot,pawn.Handle);grenade.TeamNum=p.TeamNum;grenade.Thrower.Raw=p.PlayerPawn.Raw;grenade.OriginalThrower.Raw=p.PlayerPawn.Raw;grenade.OwnerEntity.Raw=p.PlayerPawn.Raw;

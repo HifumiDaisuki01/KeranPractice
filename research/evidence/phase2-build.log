@@ -1,0 +1,10 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  KeranPractice.Core -> /root/keranpractice-v2/repo/src/KeranPractice.Core/bin/Release/net10.0/KeranPractice.Core.dll
+  KeranPractice -> /root/keranpractice-v2/repo/src/KeranPractice/bin/Release/net10.0/KeranPractice.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.45
