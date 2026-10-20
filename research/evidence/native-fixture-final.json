@@ -1,0 +1,187 @@
+{
+  "SyntheticFactoryFixtures": true,
+  "RealHumanThrows": false,
+  "Results": [
+    {
+      "Kind": "smoke",
+      "EffectEvent": true,
+      "Landing": {
+        "X": 417.57614,
+        "Y": 2112.6165,
+        "Z": -126.18933,
+        "Finite": true,
+        "Length": 2157.1838
+      },
+      "RepeatLandingDifference": null,
+      "SmokeVolume": true,
+      "BurningFireCount": 0,
+      "HealthDamage": 0,
+      "PlayerBlindEvent": false,
+      "Elapsed": 3.015625,
+      "HumanClientValidated": false
+    },
+    {
+      "Kind": "smoke",
+      "EffectEvent": true,
+      "Landing": {
+        "X": 417.57614,
+        "Y": 2112.6165,
+        "Z": -126.18933,
+        "Finite": true,
+        "Length": 2157.1838
+      },
+      "RepeatLandingDifference": 0,
+      "SmokeVolume": true,
+      "BurningFireCount": 0,
+      "HealthDamage": 0,
+      "PlayerBlindEvent": false,
+      "Elapsed": 3,
+      "HumanClientValidated": false
+    },
+    {
+      "Kind": "flash",
+      "EffectEvent": true,
+      "Landing": {
+        "X": 418.70224,
+        "Y": 2110.6592,
+        "Z": -122.81508,
+        "Finite": true,
+        "Length": 2155.2905
+      },
+      "RepeatLandingDifference": null,
+      "SmokeVolume": false,
+      "BurningFireCount": 0,
+      "HealthDamage": 0,
+      "PlayerBlindEvent": true,
+      "Elapsed": 3,
+      "HumanClientValidated": false
+    },
+    {
+      "Kind": "flash",
+      "EffectEvent": true,
+      "Landing": {
+        "X": 418.70224,
+        "Y": 2110.6592,
+        "Z": -122.81508,
+        "Finite": true,
+        "Length": 2155.2905
+      },
+      "RepeatLandingDifference": 0,
+      "SmokeVolume": false,
+      "BurningFireCount": 0,
+      "HealthDamage": 0,
+      "PlayerBlindEvent": true,
+      "Elapsed": 3,
+      "HumanClientValidated": false
+    },
+    {
+      "Kind": "he",
+      "EffectEvent": true,
+      "Landing": {
+        "X": 418.70224,
+        "Y": 2110.6592,
+        "Z": -122.81508,
+        "Finite": true,
+        "Length": 2155.2905
+      },
+      "RepeatLandingDifference": null,
+      "SmokeVolume": false,
+      "BurningFireCount": 0,
+      "HealthDamage": 84,
+      "PlayerBlindEvent": false,
+      "Elapsed": 3,
+      "HumanClientValidated": false
+    },
+    {
+      "Kind": "he",
+      "EffectEvent": true,
+      "Landing": {
+        "X": 418.70224,
+        "Y": 2110.6592,
+        "Z": -122.81508,
+        "Finite": true,
+        "Length": 2155.2905
+      },
+      "RepeatLandingDifference": 0,
+      "SmokeVolume": false,
+      "BurningFireCount": 0,
+      "HealthDamage": 88,
+      "PlayerBlindEvent": false,
+      "Elapsed": 3,
+      "HumanClientValidated": false
+    },
+    {
+      "Kind": "molotov",
+      "EffectEvent": true,
+      "Landing": {
+        "X": 442.13492,
+        "Y": 2102.437,
+        "Z": -49,
+        "Finite": true,
+        "Length": 2148.9827
+      },
+      "RepeatLandingDifference": null,
+      "SmokeVolume": false,
+      "BurningFireCount": 16,
+      "HealthDamage": 40,
+      "PlayerBlindEvent": false,
+      "Elapsed": 3,
+      "HumanClientValidated": false
+    },
+    {
+      "Kind": "molotov",
+      "EffectEvent": true,
+      "Landing": {
+        "X": 442.13492,
+        "Y": 2102.437,
+        "Z": -49,
+        "Finite": true,
+        "Length": 2148.9827
+      },
+      "RepeatLandingDifference": 0,
+      "SmokeVolume": false,
+      "BurningFireCount": 16,
+      "HealthDamage": 40,
+      "PlayerBlindEvent": false,
+      "Elapsed": 3,
+      "HumanClientValidated": false
+    },
+    {
+      "Kind": "decoy",
+      "EffectEvent": true,
+      "Landing": {
+        "X": 417.57614,
+        "Y": 2112.6165,
+        "Z": -126.18933,
+        "Finite": true,
+        "Length": 2157.1838
+      },
+      "RepeatLandingDifference": null,
+      "SmokeVolume": false,
+      "BurningFireCount": 0,
+      "HealthDamage": 0,
+      "PlayerBlindEvent": false,
+      "Elapsed": 3,
+      "HumanClientValidated": false
+    },
+    {
+      "Kind": "decoy",
+      "EffectEvent": true,
+      "Landing": {
+        "X": 417.57614,
+        "Y": 2112.6165,
+        "Z": -126.18933,
+        "Finite": true,
+        "Length": 2157.1838
+      },
+      "RepeatLandingDifference": 0,
+      "SmokeVolume": false,
+      "BurningFireCount": 0,
+      "HealthDamage": 0,
+      "PlayerBlindEvent": false,
+      "Elapsed": 3,
+      "HumanClientValidated": false
+    }
+  ],
+  "PluginSHA256": "dd4e7bca5f786c0dabc42d42eb2f026454f71caa98f5a6f917c3795a6195e850"
+}

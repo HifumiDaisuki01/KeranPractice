@@ -47,3 +47,10 @@
 - `!rethrow` 在移动中投掷时轨迹不能 100% 复现（重投不带水平速度）
 - `!impacts` 只有控制台坐标输出，无 3D 标记（CSS 1.0.376 未暴露 DebugDraw）
 - 游戏内功能需真人验证（见 README 第七、八节）
+
+## 2.0.0 review — rewrite/v2.0
+
+- Replaced v1 architecture with independent domain/persistence, sessions/access policy and audited Linux native capture/replay.
+- Phase1: noflash, private positions, last/back, native rethrow, scoped cleanup and cancellable batch autoclear.
+- Current build: zero compiler warnings/errors, 26 automated tests, ten isolated synthetic native throws with actual effects and five zero-error repeat landings. These are NOT human throw acceptance.
+- Phase2/3 remain unimplemented pending Phase1 acceptance; no BOT management, fake impacts or stable Release. Formal server v1 DLL/config unchanged.

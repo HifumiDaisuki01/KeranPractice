@@ -1,0 +1,10 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  KeranPractice.Core -> /root/keranpractice-v2/repo/src/KeranPractice.Core/bin/Release/net10.0/KeranPractice.Core.dll
+  KeranPractice.Tests -> /root/keranpractice-v2/repo/tests/KeranPractice.Tests/bin/Release/net10.0/KeranPractice.Tests.dll
+Test run for /root/keranpractice-v2/repo/tests/KeranPractice.Tests/bin/Release/net10.0/KeranPractice.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+WARNING: Overwriting results file: /root/keranpractice-v2/repo/artifacts/tests/core.trx
+Results File: /root/keranpractice-v2/repo/artifacts/tests/core.trx
+
+Passed!  - Failed:     0, Passed:    26, Skipped:     0, Total:    26, Duration: 280 ms - KeranPractice.Tests.dll (net10.0)

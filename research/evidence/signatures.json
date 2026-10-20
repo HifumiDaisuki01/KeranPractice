@@ -1,0 +1,40 @@
+{
+  "SHA256": "d73f5d3b360fce87708451a239f8961399b34a2f7e4354326a5948c8676cfad2",
+  "Factories": {
+    "smoke": {
+      "Signature": "55 4C 89 C1 48 89 E5 41 57 49 89 FF 41 56 45 89 CE",
+      "FileOffsets": [
+        "0x145d340"
+      ],
+      "VirtualAddress": "0x145e340"
+    },
+    "he": {
+      "Signature": "55 4C 89 C1 48 89 E5 41 57 49 89 FF 41 56 49 89 D6",
+      "FileOffsets": [
+        "0xd25890"
+      ],
+      "VirtualAddress": "0xd26890"
+    },
+    "molotov": {
+      "Signature": "55 48 8D 05 ? ? ? ? 48 89 E5 41 57 41 56 41 55 41 54 49 89 FC 53 48 81 EC ? ? ? ? 4C 8D 35 ? ? ? ?",
+      "FileOffsets": [
+        "0x1459ea0"
+      ],
+      "VirtualAddress": "0x145aea0"
+    },
+    "decoy": {
+      "Signature": "55 4C 89 C1 48 89 E5 41 57 45 89 CF 41 56 49 89 FE 41 55 49 89 D5 48 89 F2 48 89 FE 41 54 48 8D 3D ? ? ? ? 4D 89 C4 53 48 83 EC ? E8 ? ? ? ? 45 31 C0",
+      "FileOffsets": [
+        "0x145cba0"
+      ],
+      "VirtualAddress": "0x145dba0"
+    },
+    "flash": {
+      "Signature": "55 4C 89 C1 48 89 E5 41 57 45 89 CF 41 56 49 89 FE 41 55 49 89 D5 48 89 F2 48 89 FE 41 54 48 8D 3D ? ? ? ? 4D 89 C4 53 48 83 EC 08 E8 ? ? ? ? 4C 89 EE",
+      "FileOffsets": [
+        "0xd24f30"
+      ],
+      "VirtualAddress": "0xd25f30"
+    }
+  }
+}
