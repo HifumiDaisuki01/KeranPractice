@@ -1,0 +1,15 @@
+{
+  "FormalPracticeDLLUnchanged": true,
+  "FormalPracticeConfigurationUnchanged": true,
+  "FormalCS2PID60515StillPresent": true,
+  "TestPort": 27025,
+  "ProductionPort": 27015,
+  "HumanClientTested": false,
+  "Environment": {
+    "CS2": "1.41.9.1/14191",
+    "CSS": "1.0.376",
+    "Runtime": "10.0.3",
+    "OS": "Debian12 Linux x86_64"
+  },
+  "FinalPluginSHA256": "dd4e7bca5f786c0dabc42d42eb2f026454f71caa98f5a6f917c3795a6195e850"
+}

@@ -1,0 +1,18 @@
+{
+  "ModuleVersion": "2.0.0-phase3-review",
+  "Native": "ready",
+  "VisualsReady": true,
+  "Probe": {
+    "Raw": 4253909368,
+    "GeometryReadback": true,
+    "Expired": true,
+    "ActiveAfterExpiry": 0
+  },
+  "LoadedPlugins": 12,
+  "sv_showimpacts": 0,
+  "sv_infinite_ammo": 0,
+  "FilterRemovalsObserved": 0,
+  "ClientRenderVerified": false,
+  "TwoClientIsolationVerified": false,
+  "RestartedServer": false
+}

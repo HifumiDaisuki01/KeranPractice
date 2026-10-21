@@ -1,49 +1,30 @@
-# Changelog
+# 变更记录
 
-## 1.0.0 — 2026-10-20
+## v2.0.0 — 2026-10-21
 
-首个正式版本。
+- 独立重构训练核心：原生真实道具重投、个人清理/延迟清理、免闪、私人位置与道具库。
+- 个人道具补充与管理员跨模式autosupply，不修改枪械弹药；飞行/无敌/复活/出生点工具与权限、生命周期恢复。
+- 个人3D弹着点及真实道具轨迹；有上限的隐藏实体复用、限速及发送过滤优化。
+- 小更新兼容改为逐函数ELF/唯一签名/指令与调用目标/已加载内存检查；SHA256及旧偏移仅作记录，异常函数单独停用。
+- 服主反馈全部功能正常，批准合并main并正式发布；77项自动测试通过。
+- Linux优先；BOT管理未开放，保留KeranStrat及所有旧Release。
 
-### 新增
+## 2.0.0 Phase 3 可视化审查构建
 
-**训练会话**
-- `!practice` 开启/关闭训练会话，关闭时自动恢复被插件修改的状态
-- `!phelp` 中文帮助菜单
+- 新增个人 !impacts [on/off] 3D弹着点十字与 !trajectory [on/off] 真实道具轨迹（原投绿、重投橙）。
+- 使用beam实体及CheckTransmit会话过滤，不设置全局sv_showimpacts；仅本插件登记的实体参与清理。
+- 每人192/全服512条默认上限，3秒弹着点/12秒轨迹、每颗道具最多96段；开关、断线、地图/回合结束和卸载清理。
+- 64项单元测试通过，编译零错误零警告。Phase2收到用户真人验证成功反馈；新增可视化客户端验证待完成。BOT管理未开放。
 
-**闪光免疫**
-- `!noflash [on/off]` 个人闪光免疫
-- 基于 `EventPlayerBlind` + `FlashDuration` 清零，配合 0.1 秒兜底定时器（无人使用时自动停止）
-- 开启瞬间清除已有闪白
+## 2.0.0 Phase 2.1 审查构建
 
-**位置系统**
-- `!savepos [名称]` / `!tp [名称]` / `!poslist` / `!delpos`
-- `!last` 回到上一颗道具投掷点
-- `!spawn` / `!tspawn [n]` / `!ctspawn [n]` 出生点传送
-- 按 `SteamID + 地图` 隔离，JSON 原子写入
+- 新增管理员个人 `!autosupply [on/off]`，明确开启后允许在所有模式（含KS/KSV/KSD）自动补充本人真实投出的道具；无参数切换。关闭立即取消补发。默认模式规则保留，枪械弹药与其他玩家不变。
+- 53项单元测试通过；新增开关的真人投掷验收待完成。
 
-**投掷物**
-- `!rethrow` 重投上一颗道具（传送回原点 + 恢复视角 + 给道具 + 模拟投掷）
-- `!clear` 清除投掷物与火焰
-- `!autoclear [on/off]` 投掷后延迟自动清理
-- `!savenade` / `!nades` / `!loadnade`
+## 2.0.0 Phase 2 审查构建
 
-**训练工具**
-- `!noclip` / `!god` / `!impacts` / `!respawn`
-- `!restart`（默认受 KeranStrat 保护阻止）
-
-**BOT**
-- `!bot` / `!tbot` / `!ctbot` / `!placebot` / `!removebot`
-- `!clearbots` / `!freezebot` / `!swapbot`
-- 按 UserId 归属，只操作本插件创建的 BOT
-
-**基础设施**
-- JSON 配置 + 无 BOM 原子写入
-- SteamID64 权限白名单 + 指令冷却
-- 热重载完整清理（定时器、玩家状态）
-- KeranStrat 共存：指令前缀隔离、BOT 归属隔离、回合重置保护
-
-### 已知问题
-
-- `!rethrow` 在移动中投掷时轨迹不能 100% 复现（重投不带水平速度）
-- `!impacts` 只有控制台坐标输出，无 3D 标记（CSS 1.0.376 未暴露 DebugDraw）
-- 游戏内功能需真人验证（见 README 第七、八节）
+- 私人完整道具库：savenade/loadnade/nades/delnade；玩家与地图隔离、JSON原子存储、默认64条、同名覆盖。
+- 个人道具补充：普通KP训练自动补；KS/KSV仅手动nadesupply；KSD拒绝；双闪、阵营火、不修改枪械弹药或全服无限弹药。
+- 管理员noclip/god、respawn、spawn/tspawn/ctspawn；同Pawn原状态恢复与KSD保护。
+- 分行中文帮助、控制台快捷绑定；48项单元测试通过。新增真人验收待完成。
+- 保留所有旧Release，不发布正式v2.0.0。

@@ -1,0 +1,1 @@
+Phase 1 review build, NOT a stable Release. Read ../VALIDATION-v2.0.md before installation. Real-player acceptance remains outstanding; production v1 and prior Releases are unchanged. The ZIP contains only this plugin, its own module-scoped gamedata and an EXAMPLE configuration; it does not overwrite live configuration or legacy data.
