@@ -19,8 +19,8 @@ public sealed class PracticeConfig : BasePluginConfig
     public float AutoClearDelaySeconds {get;set;}=3;
     public bool EnableNativeReplay {get;set;}=true;
     public int MaxTrackedEntities {get;set;}=256;
-    public int MaxVisualsPerPlayer {get;set;}=192;
-    public int MaxVisualsGlobal {get;set;}=512;
+    public int MaxVisualsPerPlayer {get;set;}=96;
+    public int MaxVisualsGlobal {get;set;}=256;
     public float ImpactSeconds {get;set;}=3;
     public float TrajectorySeconds {get;set;}=12;
 }
@@ -34,6 +34,8 @@ public sealed class Session(Owner owner,uint controller)
     public long VisualGeneration {get;set;}
     public int ImpactTick {get;set;}=-1;
     public int ImpactsThisTick {get;set;}
+    public float ImpactWindow {get;set;}
+    public int ImpactWindowCount {get;set;}
     public bool NoFlash {get;set;}
     public bool SupplyEnabled {get;set;}=true;
     public bool CrossModeSupply {get;set;}
@@ -52,7 +54,7 @@ public sealed class Session(Owner owner,uint controller)
 public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<PracticeConfig>
 {
     public override string ModuleName=>"KeranPractice";
-    public override string ModuleVersion=>"2.0.0-phase3-review";
+    public override string ModuleVersion=>"2.0.0";
     public override string ModuleAuthor=>"Keran Technology © 2026";
     public override string ModuleDescription=>"Independent practice rewrite; native physics replay";
     public PracticeConfig Config {get;set;}=new();
@@ -82,7 +84,7 @@ public sealed partial class KeranPracticePlugin : BasePlugin,IPluginConfig<Pract
         if(Config.EnableNativeReplay)_native.Initialize(Path.Combine(ModuleDirectory,"gamedata/keranpractice-v2.json"));
         foreach(var cmd in new[]{"practice","phelp","noflash","savepos","tp","poslist","delpos","last","back","rethrow","clear","clearall","autoclear","nadesupply","autosupply","savenade","loadnade","nades","delnade","noclip","god","respawn","spawn","tspawn","ctspawn","impacts","trajectory"})
         {var name=cmd;AddCommand("css_"+name,"KeranPractice v2: "+name,(player,args)=>Execute(name,player,args));}
-        AddCommand("kpv2_status","Read-only diagnostics",(_,cmd)=>cmd.ReplyToCommand($"KeranPractice 2.0.0-phase3-review; native={_native.Status}; sessions={_sessions.Count}; bots=disabled; dataVersion=2"));
+        AddCommand("kpv2_status","Read-only diagnostics",(_,cmd)=>cmd.ReplyToCommand($"KeranPractice 2.0.0; native={_native.Status}; sessions={_sessions.Count}; bots=disabled; dataVersion=2"));
         RegisterEventHandler<EventPlayerBlind>((e,_)=>{if(e.Userid is {} p&&_sessions.TryGetValue(p.SteamID,out var s)&&s.NoFlash)ClearFlash(p);return HookResult.Continue;},HookMode.Pre);
         RegisterListener<Listeners.OnClientDisconnect>(slot=>{if(_slots.Remove(slot,out var id))Exit(id);});
         RegisterListener<Listeners.OnMapStart>(_=>ResetMap());

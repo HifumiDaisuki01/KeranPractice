@@ -5,6 +5,8 @@ public sealed class VisualTests
 {
     private static readonly Owner A=new(1,1,1),B=new(2,1,1);
     private static VisualMark Mark(uint raw,Owner owner,double expiry=10,string kind="trajectory")=>new(raw,(int)(raw&0x7fff),owner,kind,expiry);
+    [Fact]public void HiddenPoolCanReuseSameSerialWithoutGrowing(){var db=new VisualRegistry(3,3);var mark=Mark(1,A);db.Add(mark);db.Update(mark with{Active=false,ExpiresAt=double.MaxValue});Assert.False(Assert.Single(db.Marks).Active);db.Add(mark with{ExpiresAt=20});Assert.Single(db.Marks);Assert.True(Assert.Single(db.Marks).Active);}
+    [Fact]public void PoolIsRemovedWithOwnerOnExit(){var db=new VisualRegistry(3,3);db.Add(Mark(1,A) with{Active=false,ExpiresAt=double.MaxValue});Assert.Single(db.Take(m=>m.Owner==A));Assert.Empty(db.Marks);}
     [Fact]public void OnlyExactConnectionAndMapCanSee(){var m=Mark(1,A);Assert.True(VisualRegistry.Visible(m,A));Assert.False(VisualRegistry.Visible(m,B));Assert.False(VisualRegistry.Visible(m,new Owner(1,2,1)));Assert.False(VisualRegistry.Visible(m,new Owner(1,1,2)));Assert.False(VisualRegistry.Visible(m,null));}
     [Fact]public void PerPlayerLimitEvictsOwnOldestOnly(){var db=new VisualRegistry(3,10);db.Add(Mark(1,A,1));db.Add(Mark(2,A,2));db.Add(Mark(3,A,3));db.Add(Mark(4,B,0));var evicted=db.Add(Mark(5,A,4));Assert.Equal(1u,Assert.Single(evicted).Raw);Assert.Equal(4,db.Marks.Count);Assert.Contains(db.Marks,m=>m.Owner==B);}
     [Fact]public void GlobalLimitIsHardBound(){var db=new VisualRegistry(10,3);for(uint n=1;n<=100;n++)db.Add(Mark(n,n%2==0?A:B,n));Assert.Equal(3,db.Marks.Count);Assert.All(db.Marks,m=>Assert.True(m.Raw>=98));}

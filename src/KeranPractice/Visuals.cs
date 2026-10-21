@@ -14,7 +14,7 @@ public sealed partial class KeranPracticePlugin
     private VisualMark[] _visualSnapshot=[];
     private Timer? _visualTimer;
     private bool _visualsReady;
-    private long _visualCreates,_visualFiltered;
+    private long _visualCreates,_visualFiltered,_visualReuses,_impactEvents,_impactDrawn,_impactDropped;
     private void RegisterVisuals()
     {
         _visuals=new(Config.MaxVisualsPerPlayer,Config.MaxVisualsGlobal);
@@ -23,17 +23,18 @@ public sealed partial class KeranPracticePlugin
         catch(Exception e){Logger.LogError(e,"Private visual transmission unavailable; visuals disabled");}
         RegisterEventHandler<EventBulletImpact>((e,_)=>
         {
-            var p=e.Userid;
+            _impactEvents++;var p=e.Userid;
             if(_visualsReady&&p is {IsValid:true,IsBot:false}&&_sessions.TryGetValue(p.SteamID,out var s)&&Current(p,s)&&s.Active&&s.Impacts)
             {
                 // Bound high-rate pellets/penetrations independently of registry entity eviction.
                 if(s.ImpactTick!=Server.TickCount){s.ImpactTick=Server.TickCount;s.ImpactsThisTick=0;}
-                if(++s.ImpactsThisTick<=8)DrawCross(s.Owner,"impact",new(e.X,e.Y,e.Z),2.5f,Color.DeepSkyBlue,Config.ImpactSeconds);
+                if(Server.CurrentTime-s.ImpactWindow>=1||Server.CurrentTime<s.ImpactWindow){s.ImpactWindow=Server.CurrentTime;s.ImpactWindowCount=0;}
+                if(++s.ImpactsThisTick<=2&&s.ImpactWindowCount<16){s.ImpactWindowCount++;_impactDrawn++;DrawCross(s.Owner,"impact",new(e.X,e.Y,e.Z),2.5f,Color.DeepSkyBlue,Config.ImpactSeconds);}else _impactDropped++;
             }
             return HookResult.Continue;
         });
         RegisterListener<Listeners.OnEntityDeleted>(e=>{if(_visuals.Remove(e.EntityHandle.Raw))RefreshVisualSnapshot();});
-        AddCommand("kpv2_visual_status","Read-only visual diagnostics",(_,cmd)=>cmd.ReplyToCommand($"visuals ready={_visualsReady}; active={_visualSnapshot.Length}; created={_visualCreates}; filterRemovals={_visualFiltered}; perPlayer={Config.MaxVisualsPerPlayer}; global={Config.MaxVisualsGlobal}"));
+        AddCommand("kpv2_visual_status","Read-only visual diagnostics",(_,cmd)=>cmd.ReplyToCommand($"visuals ready={_visualsReady}; active={_visualSnapshot.Count(m=>m.Active)}; allocated={_visualSnapshot.Length}; created={_visualCreates}; reused={_visualReuses}; impacts={_impactEvents}/{_impactDrawn}; rateDropped={_impactDropped}; filterRemovals={_visualFiltered}; perPlayer={Config.MaxVisualsPerPlayer}; global={Config.MaxVisualsGlobal}"));
         AddCommand("kpv2_visual_probe","Console-only hidden beam geometry/expiry integration check",(p,cmd)=>
         {
             if(p!=null){cmd.ReplyToCommand("Console only");return;}
@@ -43,7 +44,13 @@ public sealed partial class KeranPracticePlugin
             var beam=Resolve<CBeam>(raw);
             bool geometry=beam is {IsValid:true}&&beam.EndPos.X==10&&beam.EndPos.Y==20&&beam.EndPos.Z==-4076;
             cmd.ReplyToCommand($"Hidden beam raw={raw}; geometryReadback={geometry}; expiryPending=true (not a client render test)");
-            AddTimer(.8f,()=>Logger.LogInformation("Visual probe raw={Raw}; geometryReadback={Geometry}; expired={Expired}; clientRenderVerified=false",raw,geometry,Resolve<CBeam>(raw) is not {IsValid:true}),TimerFlags.STOP_ON_MAPCHANGE);
+            AddTimer(.8f,()=>
+            {
+                bool hidden=Resolve<CBeam>(raw) is {IsValid:true,TurnedOff:true};
+                uint reused=DrawBeam(owner,"probe",new(0,0,-4096),new(20,30,-4066),Color.White,.25f);
+                bool same=raw==reused;ClearVisuals(owner);
+                AddTimer(.15f,()=>Logger.LogInformation("Visual probe geometryReadback={Geometry}; expiredHidden={Hidden}; reusedSameEntity={Reused}; cleanedAfterEngineFrame={Cleaned}; clientRenderVerified=false",geometry,hidden,same,Resolve<CBeam>(raw) is not {IsValid:true}),TimerFlags.STOP_ON_MAPCHANGE);
+            },TimerFlags.STOP_ON_MAPCHANGE);
         });
     }
     private void VisualCommand(string command,CCSPlayerController p,Session s,CommandInfo cmd)
@@ -67,8 +74,8 @@ public sealed partial class KeranPracticePlugin
             if(player is {IsValid:true,IsBot:false}&&_sessions.TryGetValue(player.SteamID,out var s)&&Current(player,s)&&s.Active)recipient=s.Owner;
             foreach(var mark in snapshot)
             {
-                var beam=Resolve<CBeam>(mark.Raw);
-                if(beam is not {IsValid:true}||beam.Index!=mark.Index)continue;
+                // Immutable index snapshot is removed synchronously by OnEntityDeleted.
+                // No per-viewer native handle/schema lookups in this hot path.
                 if(VisualRegistry.Visible(mark,recipient))info.TransmitEntities.Add(mark.Index);
                 else
                 {
@@ -85,7 +92,12 @@ public sealed partial class KeranPracticePlugin
         CBeam? beam=null;
         try
         {
-            beam=Utilities.CreateEntityByName<CBeam>("beam");
+            var own=_visuals.Marks.Where(m=>m.Owner==owner).ToArray();
+            var reuse=own.FirstOrDefault(m=>!m.Active&&m.Kind==kind);
+            if(reuse==null&&(own.Length>=Config.MaxVisualsPerPlayer||kind=="impact"&&own.Count(m=>m.Kind==kind)>=48))reuse=own.Where(m=>kind!="impact"||m.Kind=="impact").MinBy(m=>m.ExpiresAt)??own.MinBy(m=>m.ExpiresAt);
+            if(reuse!=null){beam=Resolve<CBeam>(reuse.Raw);if(beam is not {IsValid:true}){_visuals.Remove(reuse.Raw);beam=null;}}
+            bool fresh=beam==null;
+            beam??=Utilities.CreateEntityByName<CBeam>("beam");
             if(beam is not {IsValid:true})throw new InvalidOperationException("Engine did not create beam");
             if(beam.Index>=Utilities.MaxEdicts)throw new InvalidOperationException("Beam index outside networked entity range");
             uint raw=beam.EntityHandle.Raw;
@@ -96,8 +108,11 @@ public sealed partial class KeranPracticePlugin
             beam.LifeState=1;beam.Damage=0;beam.Width=.7f;beam.EndWidth=.7f;beam.Render=color;
             beam.EndPos.X=end.X;beam.EndPos.Y=end.Y;beam.EndPos.Z=end.Z;
             beam.Teleport(new Vector(start.X,start.Y,start.Z),new QAngle(0,0,0),new Vector(0,0,0));
-            beam.DispatchSpawn();Utilities.SetStateChanged(beam,"CBeam","m_vecEndPos");
-            _visualCreates++;
+            beam.TurnedOff=false;
+            if(fresh){beam.DispatchSpawn();_visualCreates++;}else _visualReuses++;
+            Utilities.SetStateChanged(beam,"CBeam","m_vecEndPos");
+            Utilities.SetStateChanged(beam,"CBeam","m_bTurnedOff");
+            Utilities.SetStateChanged(beam,"CBaseModelEntity","m_clrRender");
             _visualTimer??=AddTimer(.25f,ExpireVisuals,TimerFlags.REPEAT);
             return raw;
         }
@@ -125,9 +140,15 @@ public sealed partial class KeranPracticePlugin
     }
     private void ExpireVisuals()
     {
-        foreach(var mark in _visuals.Take(m=>m.ExpiresAt<=Server.CurrentTime))RemoveVisual(mark);
+        // Keep a bounded, hidden pool for each owner, avoiding spawn/delete churn on every bullet.
+        foreach(var mark in _visuals.Marks.Where(m=>m.Active&&m.ExpiresAt<=Server.CurrentTime).ToArray())
+        {
+            var beam=Resolve<CBeam>(mark.Raw);
+            if(beam is not {IsValid:true}){_visuals.Remove(mark.Raw);continue;}
+            beam.TurnedOff=true;Utilities.SetStateChanged(beam,"CBeam","m_bTurnedOff");
+            _visuals.Update(mark with{Active=false,ExpiresAt=double.MaxValue});
+        }
         RefreshVisualSnapshot();
-        if(_visualSnapshot.Length==0){_visualTimer?.Kill();_visualTimer=null;}
     }
     private void DisableVisuals()
     {

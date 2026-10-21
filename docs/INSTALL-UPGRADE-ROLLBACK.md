@@ -1,6 +1,6 @@
 # 安装、迁移和回滚
 
-这是 rewrite/v2.0 的 Phase 2 审查构建，不是已完成真人验收的正式2.0发行。
+这是 main 的 v2.0.0 正式发行；旧Release与Git历史保留。
 
 ## 安装
 
@@ -32,10 +32,6 @@ v2写入 `plugins/KeranPractice/data/archive-v2.json`，不覆盖旧positions.js
 ## 更新游戏后
 
 gamedata/keranpractice-v2.json是本插件私有的版本审计manifest，不是可随意放进CSS全局gamedata目录的通用JSON。
-它包括Linux server二进制SHA256、每个签名及唯一匹配的文件偏移。游戏更新即停止原生重投；重新审计ELF可执行区、参数ABI和隔离引爆/伤害后再更新，不能只把新hash写进去。
+其中SHA256和旧偏移用于诊断，不再作为整库硬锁。每个工厂分别校验唯一签名、ELF可执行段、约500字节重定位屏蔽的已审计指令、直接调用目标及已加载内存；无关变化或函数整体移动可继续启用，实际函数变化暂停该函数。不能仅改hash或扩大通配符强行放行，需要重新核对ABI和实际引爆效果。
 
-## Phase 2 存档升级
-
-archive-v2结构保持Version2，原Positions及已有Lineups均保留；旧v2没有Lineups字段时按空列表读取。MaxLineupsPerMap默认64。公共个人命令需要加入PublicPersonalCommands；不要给普通玩家god/noclip/clearall。
-
-`!loadnade`会返回保存站位并选中完整快照，`!rethrow`不移动玩家。`!last`仍返回最近真实投掷站位。
+正式安装包把示例配置放在examples，解压不会覆盖当前配置或玩家数据。升级只替换DLL/Core依赖/deps与模块gamedata；备份后卸载/加载KeranPractice即可，不需要重启CS2或切图。

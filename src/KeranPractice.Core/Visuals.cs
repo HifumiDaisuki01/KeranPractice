@@ -1,5 +1,5 @@
 namespace KeranPractice.Core;
-public sealed record VisualMark(uint Raw,int Index,Owner Owner,string Kind,double ExpiresAt);
+public sealed record VisualMark(uint Raw,int Index,Owner Owner,string Kind,double ExpiresAt,bool Active=true);
 public sealed class VisualRegistry(int perOwner,int global)
 {
     private readonly Dictionary<uint,VisualMark> _marks=[];
@@ -15,6 +15,7 @@ public sealed class VisualRegistry(int perOwner,int global)
         {var oldest=_marks.Values.MinBy(m=>m.ExpiresAt)!;_marks.Remove(oldest.Raw);evicted.Add(oldest);}
         _marks[mark.Raw]=mark;return evicted;
     }
+    public void Update(VisualMark mark){if(!_marks.ContainsKey(mark.Raw))throw new InvalidOperationException("Unknown visual handle");_marks[mark.Raw]=mark;}
     public bool Remove(uint raw)=>_marks.Remove(raw);
     public IReadOnlyList<VisualMark> Take(Func<VisualMark,bool> predicate)
     {
